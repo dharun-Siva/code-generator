@@ -1,0 +1,94 @@
+.floating-label-group {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+.floating-input {
+  width: 100%;
+  padding: 1.1rem 0.9rem 0.5rem 0.9rem;
+  border: 1.5px solid #0074d9;
+  border-radius: 6px;
+  outline: none;
+  font-size: 1rem;
+  background: #fff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.floating-input:focus {
+  border-color: #005fa3;
+}
+.floating-label {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+  font-size: 1rem;
+  pointer-events: none;
+  background: #fff;
+  padding: 0 0.2em;
+  transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  box-sizing: border-box;
+}
+.floating-input:focus + .floating-label,
+.floating-label.filled {
+  top: -0.7rem;
+  left: 0.7rem;
+  transform: none;
+  font-size: 0.92em;
+  color: #0074d9;
+  background: #fff;
+  padding: 0 0.3em;
+  z-index: 2;
+}
+.auth-container {
+  max-width: 350px;
+  margin: 4rem auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  padding: 2rem;
+}
+.auth-toggle {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.auth-toggle button {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  padding: 0.5rem 1.5rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: border 0.2s;
+}
+.auth-toggle .active {
+  border-bottom: 2px solid #222;
+  font-weight: bold;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+.auth-form label {
+  margin: 0.5rem 0 0.2rem 0;
+  font-size: 0.95rem;
+}
+/* Remove old input styles for floating label fields */
+.auth-form button[type="submit"] {
+  background: #222;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7rem;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+}
+.role-select {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+}

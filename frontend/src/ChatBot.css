@@ -1,0 +1,73 @@
+ .chatbot-container {
+  width: 100%;
+  max-width: 900px;
+  height: 420px;
+  display: flex;
+  flex-direction: column;
+  margin: 2rem auto;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.chatbot-header {
+  background: #0074d9;
+  color: #fff;
+  padding: 1rem;
+  border-radius: 14px 14px 0 0;
+  font-weight: bold;
+  font-size: 1.1rem;
+  text-align: center;
+}
+.chatbot-message.user {
+  background: none;
+  color: #222;
+  align-self: flex-end;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+.chatbot-message-user-text {
+  display: inline-block;
+  text-align: right;
+  min-width: 60px;
+  font-size: 1rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.chatbot-message.bot {
+  background: none;
+  color: #222;
+  align-self: flex-start;
+  text-align: left;
+}
+/* Removed duplicate .chatbot-message.user and > span,div,p,pre rules to fix syntax error */
+.chatbot-input-area {
+  display: flex;
+  border-top: 1px solid #eee;
+  padding: 0.7rem;
+  background: #fafbfc;
+  border-radius: 0 0 14px 14px;
+}
+.chatbot-input {
+  flex: 1;
+  border: 1.5px solid #0074d9;
+  border-radius: 8px;
+  padding: 0.6em 1em;
+  font-size: 1rem;
+  outline: none;
+  margin-right: 0.5rem;
+}
+.chatbot-send-btn {
+  background: #0074d9;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6em 1.2em;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.chatbot-send-btn:hover {
+  background: #005fa3;
+}
