@@ -46,3 +46,72 @@
 .sidebar-text {
   font-size: 1.1rem;
 }
+
+.sidebar-chat-list {
+  padding: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  border-top: 1px solid #ddd;
+  margin: 0.5rem 0;
+}
+
+.sidebar-no-chats {
+  text-align: center;
+  color: #999;
+  padding: 1rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sidebar-chat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-chat-item:hover {
+  background: #f9f9f9;
+  border-color: #0074d9;
+}
+
+.sidebar-chat-item-content {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.sidebar-chat-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 0.3rem;
+}
+
+.sidebar-chat-date {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.sidebar-chat-delete {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  margin-left: 0.5rem;
+  transition: color 0.2s;
+  font-size: 1rem;
+}
+
+.sidebar-chat-delete:hover {
+  color: #d9534f;
+}

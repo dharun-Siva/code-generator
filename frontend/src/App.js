@@ -58,7 +58,7 @@ function App() {
         return;
       }
       const data = await response.json();
-      const userObj = { email: data.email, role: data.role };
+      const userObj = { id: data.id, email: data.email, role: data.role };
       setUser(userObj);
       localStorage.setItem('user', JSON.stringify(userObj));
       if (data.role === 'admin') {
