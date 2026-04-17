@@ -42,14 +42,14 @@ const AdminDashboard = ({ user }) => {
   return (
     <div>
       {/* Custom header for admin dashboard */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: '#f5f5f5', boxShadow: '0 2px 4px rgba(0,0,0,0.03)', position: 'relative' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: '#f5f5f5', boxShadow: '0 2px 4px rgba(0,0,0,0.03)', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000, height: '100px' }}>
         <div style={{ position: 'absolute', left: 32, fontWeight: 'bold', fontSize: '1rem', color: '#333' }}></div>
         <div style={{ fontWeight: 'bold', fontSize: '1.5rem', letterSpacing: 1 }}>Admin Panel</div>
         <div style={{ position: 'absolute', right: 32 }}>
           {/* Profile/email section, if needed, can be added here or left empty if handled globally */}
         </div>
       </header>
-      <div className="admin-dashboard-container">
+      <div style={{ marginTop: '100px' }} className="admin-dashboard-container">
         <aside className="sidebar">
           {/* Removed Admin Panel from sidebar */}
           <button

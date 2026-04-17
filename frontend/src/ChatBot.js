@@ -259,9 +259,7 @@ const ChatBot = forwardRef((props, ref) => {
   };
 
   return (
-    <div className="chatbot-container">
-      {/* Remove internal sidebar - use main Sidebar instead */}
-      <div className="chatbot-main" style={{ width: '100%' }}>
+    <div className="chatbot-main" style={{ width: '100%', maxWidth: 600, margin: '0 auto', height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {!started ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: "100%", maxWidth: 900, margin: "0 auto" }}>
             <div style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "1rem", color: "#222", textAlign: "center" }}>
@@ -330,7 +328,6 @@ const ChatBot = forwardRef((props, ref) => {
           </>
         )}
       </div>
-    </div>
   );
 });
 

@@ -8,6 +8,7 @@ import AuthPage from './AuthPage';
 import './App.css';
 
 
+
 function App() {
   const navigate = useNavigate();
   // Load user from localStorage if available
@@ -16,9 +17,13 @@ function App() {
     return stored ? JSON.parse(stored) : null;
   });
 
-  // Profile dropdown state and ref
+  // Header profile dropdown state and ref
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
+
+  // Sidebar profile dropdown state and ref
+  const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
+  const sidebarProfileRef = useRef(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -75,7 +80,7 @@ function App() {
     <div className="App">
       {/* Header with profile dropdown */}
       {user && (
-        <header style={{ height: '100px', background: '#f5f5f5', boxShadow: '0 2px 4px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <header style={{ height: '100px', background: '#f5f5f5', boxShadow: '0 2px 4px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
           <span style={{ fontWeight: '900', fontSize: '2.5rem', letterSpacing: '3px', color: '#222', textTransform: 'uppercase', width: '100%', textAlign: 'center' }}>
             CODE GENERATOR
           </span>
@@ -114,11 +119,13 @@ function App() {
           </span>
         </header>
       )}
-      <Routes>
+      <div style={{ marginTop: user ? '100px' : 0 }}>
+        <Routes>
         <Route path="/admin" element={<AdminDashboard user={user} onLogout={handleLogout} />} />
-        <Route path="/user" element={<UserDashboard user={user} onLogout={handleLogout} profileOpen={profileOpen} setProfileOpen={setProfileOpen} profileRef={profileRef} onLogout={handleLogout} />} />
+        <Route path="/user" element={<UserDashboard user={user} onLogout={handleLogout} profileOpen={sidebarProfileOpen} setProfileOpen={setSidebarProfileOpen} profileRef={sidebarProfileRef} />} />
         <Route path="/" element={<AuthPage onAuth={handleAuth} />} />
-      </Routes>
+        </Routes>
+      </div>
     </div>
   );
 }
