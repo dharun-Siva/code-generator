@@ -313,6 +313,16 @@ const ChatBot = forwardRef((props, ref) => {
               <div ref={messagesEndRef} />
             </div>
             <form className="chatbot-input-area" onSubmit={handleSend}>
+              <span className="chatbot-plus-symbol" onClick={() => document.getElementById('chatbot-file-input').click()}>+</span>
+              <input
+                id="chatbot-file-input"
+                type="file"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  // You can handle the file here if needed
+                  // Example: const file = e.target.files[0];
+                }}
+              />
               <input
                 type="text"
                 placeholder="Type your message..."

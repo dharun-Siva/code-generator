@@ -7,6 +7,10 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   const chatBotRef = useRef();
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
+  const [showAppNameInput, setShowAppNameInput] = useState(false);
+  const [appName, setAppName] = useState("");
+  const [showOpenList, setShowOpenList] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const API_URL = 'http://localhost:8000';
 
@@ -29,11 +33,32 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     }
   };
 
-  // Handler to reset chat
+  // Handler to create a new chat with application name
+  // Handler to show app name input
   const handleNewChat = () => {
-    setCurrentChatId(null);
-    if (chatBotRef.current && chatBotRef.current.resetChat) {
-      chatBotRef.current.resetChat();
+    setShowAppNameInput(true);
+    setAppName("");
+  };
+
+  // Handler to actually create the chat after name is entered
+  const handleCreateApp = async (e) => {
+    e.preventDefault();
+    if (!appName.trim() || !user || !user.id) return;
+    try {
+      const response = await fetch(`${API_URL}/chats?user_id=${user.id}&title=${encodeURIComponent(appName.trim())}`, { method: 'POST' });
+      if (response.ok) {
+        const newChat = await response.json();
+        setChats([newChat, ...chats]);
+        setCurrentChatId(newChat.id);
+        setShowAppNameInput(false);
+        setAppName("");
+        // Reset and load the new chat in ChatBot
+        if (chatBotRef.current && chatBotRef.current.loadChatData) {
+          await chatBotRef.current.loadChatData(newChat.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error);
     }
   };
 
@@ -81,15 +106,85 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
       />
-      <div style={{ flex: 1, padding: '2rem', marginLeft: 220 }}>
-        <div style={{ marginTop: 40, display: 'flex', justifyContent: 'center' }}>
-          <ChatBot 
-            ref={chatBotRef} 
-            user={user}
-            currentChatId={currentChatId}
-            onChatSaved={handleChatSaved}
-          />
-        </div>
+      <div style={{ flex: 1, padding: '2rem', marginLeft: 220, minHeight: 'calc(100vh - 72px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {showAppNameInput ? (
+          <form onSubmit={handleCreateApp} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 400, background: '#fff', padding: 32, borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <label htmlFor="appName" style={{ fontWeight: 600, fontSize: 18, marginBottom: '2em' }}>Enter Application Name</label>
+            <input
+              id="appName"
+              type="text"
+              value={appName}
+              onChange={e => setAppName(e.target.value)}
+              placeholder="Application name"
+              autoFocus
+              style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: '2em', border: '1px solid #ccc', borderRadius: 4 }}
+            />
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="submit" style={{ fontSize: 16, padding: '6px 18px' }}>Create</button>
+              <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowAppNameInput(false); setAppName(""); }}>Cancel</button>
+              <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowAppNameInput(false); setShowOpenList(true); setSearchTerm(""); }}>Open</button>
+            </div>
+          </form>
+        ) : showOpenList ? (
+          <div style={{ width: 400, background: '#fff', padding: 32, borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {searchTerm === "" ? (
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center', marginBottom: '2em' }}>
+                <span style={{ fontWeight: 600, fontSize: 18 }}>Select Application to Open</span>
+                <button
+                  style={{ background: 'none', border: 'none', marginLeft: 10, cursor: 'pointer', fontSize: 20 }}
+                  title="Search"
+                  onClick={() => setSearchTerm(" ")}
+                >
+                  🔍
+                </button>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search applications..."
+                autoFocus
+                style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: '2em', border: '1px solid #ccc', borderRadius: 4 }}
+                onBlur={() => { if (searchTerm.trim() === "") setSearchTerm(""); }}
+              />
+            )}
+            <div style={{ width: '100%', maxHeight: 200, overflowY: 'auto', marginBottom: '2em' }}>
+              {chats.filter(chat => chat.title.toLowerCase().includes(searchTerm.trim().toLowerCase())).length === 0 ? (
+                <div style={{ color: '#888', textAlign: 'center' }}>No applications found.</div>
+              ) : (
+                chats
+                  .filter(chat => chat.title.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+                  .map(chat => (
+                    <div
+                      key={chat.id}
+                      style={{ padding: '10px 0', borderBottom: '1px solid #eee', cursor: 'pointer', fontSize: 16 }}
+                      onClick={async () => {
+                        setCurrentChatId(chat.id);
+                        setShowOpenList(false);
+                        setSearchTerm("");
+                        if (chatBotRef.current && chatBotRef.current.loadChatData) {
+                          await chatBotRef.current.loadChatData(chat.id);
+                        }
+                      }}
+                    >
+                      {chat.title}
+                    </div>
+                  ))
+              )}
+            </div>
+            <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowOpenList(false); setSearchTerm(""); }}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ width: '100%' }}>
+            <ChatBot 
+              ref={chatBotRef} 
+              user={user}
+              currentChatId={currentChatId}
+              onChatSaved={handleChatSaved}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

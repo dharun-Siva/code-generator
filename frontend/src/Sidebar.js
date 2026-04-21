@@ -7,12 +7,10 @@ const Sidebar = ({ user, profileOpen, setProfileOpen, profileRef, onLogout, onNe
   return (
     <div className="sidebar">
       <ul>
-        <li onClick={onNewChat} style={{ cursor: 'pointer' }}>
-          <span className="sidebar-icon" role="img" aria-label="New chat">📝</span>
-          <span className="sidebar-text">New chat</span>
+        <li style={{ cursor: 'pointer' }}>
+          <span className="sidebar-text" onClick={() => onNewChat()}>Create Application</span>
         </li>
         <li onClick={() => setShowChats(!showChats)} style={{ cursor: 'pointer' }}>
-          <span className="sidebar-icon" role="img" aria-label="Search chats">🔍</span>
           <span className="sidebar-text">Search chats ({chats.length})</span>
         </li>
       </ul>
@@ -21,7 +19,7 @@ const Sidebar = ({ user, profileOpen, setProfileOpen, profileRef, onLogout, onNe
       {showChats && (
         <div className="sidebar-chat-list">
           {chats.length === 0 ? (
-            <div className="sidebar-no-chats">No chats yet. Start a new chat!</div>
+            <div className="sidebar-no-chats">No chats yet. Start by creating an application!</div>
           ) : (
             chats.map((chat) => (
               <div key={chat.id} className="sidebar-chat-item">
