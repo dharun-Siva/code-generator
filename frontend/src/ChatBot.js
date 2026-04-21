@@ -15,6 +15,19 @@ const ChatBot = forwardRef((props, ref) => {
   
   // Chat list and user state
   const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
+    // Load chat data when currentChatId prop changes
+    // Always load chat data on mount and when currentChatId prop changes
+    useEffect(() => {
+      if (props.currentChatId) {
+        setCurrentChatId(props.currentChatId);
+        loadChatData(props.currentChatId);
+      } else {
+        setCurrentChatId(null);
+        setMessages([]);
+        setStarted(false);
+      }
+      // eslint-disable-next-line
+    }, [props.currentChatId]);
   const [currentUserId, setCurrentUserId] = useState(null);
   
   const messagesEndRef = useRef(null);

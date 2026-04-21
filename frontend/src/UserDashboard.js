@@ -63,11 +63,9 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   };
 
   // Handler to select a chat from sidebar
-  const handleSelectChat = async (chatId) => {
-    setCurrentChatId(chatId);
-    if (chatBotRef.current && chatBotRef.current.loadChatData) {
-      await chatBotRef.current.loadChatData(chatId);
-    }
+  const handleSelectChat = (chatId) => {
+    setCurrentChatId(null);
+    setTimeout(() => setCurrentChatId(chatId), 0);
   };
 
   // Handler to delete a chat
@@ -159,13 +157,10 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
                     <div
                       key={chat.id}
                       style={{ padding: '10px 0', borderBottom: '1px solid #eee', cursor: 'pointer', fontSize: 16 }}
-                      onClick={async () => {
-                        setCurrentChatId(chat.id);
+                      onClick={() => {
                         setShowOpenList(false);
                         setSearchTerm("");
-                        if (chatBotRef.current && chatBotRef.current.loadChatData) {
-                          await chatBotRef.current.loadChatData(chat.id);
-                        }
+                        handleSelectChat(chat.id);
                       }}
                     >
                       {chat.title}
