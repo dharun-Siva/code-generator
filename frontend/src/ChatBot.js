@@ -10,12 +10,35 @@ const ChatBot = forwardRef((props, ref) => {
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState("llama-3.1-8b-instant");
+  const [pdfLoaded, setPdfLoaded] = useState(false);  // Track if PDF is loaded
+  const [selectedPdfFile, setSelectedPdfFile] = useState(null);  // Store selected PDF file
   
   // Chat list and user state
   const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
   const [currentUserId, setCurrentUserId] = useState(null);
   
   const messagesEndRef = useRef(null);
+
+  // PDF upload handler
+  const fileInputRef = useRef(null);
+  
+  const handlePDFUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.pdf')) {
+      alert('Please upload a PDF file');
+      return;
+    }
+    
+    // Store the selected PDF file (no alert)
+    setSelectedPdfFile(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Load user data from props and localStorage
   useEffect(() => {
@@ -190,7 +213,13 @@ const ChatBot = forwardRef((props, ref) => {
       } else if (command === 'clear') {
         endpoint = `${API_URL}/agent/reset`;
         await fetch(endpoint, { method: 'POST' });
+        // Also reset PDF
+        setPdfLoaded(false);
+        await fetch(`${API_URL}/agent/pdf/reset`, { method: 'POST' });
         return "Chat history cleared! Start fresh conversation.";
+      } else if (command === 'chat' && pdfLoaded) {
+        // If PDF is loaded and user sends regular message, ask follow-up question about PDF
+        endpoint = `${API_URL}/agent/pdf/followup`;
       }
 
       const response = await fetch(endpoint, {
@@ -212,9 +241,9 @@ const ChatBot = forwardRef((props, ref) => {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && !selectedPdfFile) return;
     
-    const userMessage = input;
+    const userMessage = input || (selectedPdfFile ? `Analyze: ${selectedPdfFile.name}` : "");
     const command = detectCommand(userMessage);
     
     if (!started) setStarted(true);
@@ -222,22 +251,69 @@ const ChatBot = forwardRef((props, ref) => {
     // Add user message
     const newMessages = [
       ...messages,
-      { sender: "user", text: userMessage }
+      { sender: "user", text: userMessage || `📄 ${selectedPdfFile.name}` }
     ];
     setMessages(newMessages);
     setInput("");
 
-    // Get AI response
-    const aiResponse = await sendMessageToAPI(userMessage, command);
-    
-    const updatedMessages = [
-      ...newMessages,
-      { sender: "bot", text: aiResponse, type: command }
-    ];
-    setMessages(updatedMessages);
-    
-    // Save to database
-    saveChatToDb(updatedMessages, userMessage.substring(0, 50));
+    try {
+      setLoading(true);
+      let aiResponse;
+      
+      // If PDF is selected, upload it with the question
+      if (selectedPdfFile) {
+        const formData = new FormData();
+        formData.append('file', selectedPdfFile);
+        
+        // Encode the question as a URL parameter
+        const encodedQuestion = encodeURIComponent(userMessage.trim() || "");
+        const pdfUrl = `${API_URL}/agent/pdf/ask?question=${encodedQuestion}`;
+        
+        console.log('Sending PDF with question:', userMessage);
+        console.log('URL:', pdfUrl);
+        
+        const response = await fetch(pdfUrl, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to process PDF with question');
+        }
+        
+        const data = await response.json();
+        aiResponse = data.response;
+        
+        // Mark PDF as loaded for follow-up questions
+        setPdfLoaded(true);
+        
+        // Clear the selected file after sending
+        setSelectedPdfFile(null);
+      } else {
+        // Regular chat without PDF
+        aiResponse = await sendMessageToAPI(userMessage, command);
+      }
+      
+      const updatedMessages = [
+        ...newMessages,
+        { sender: "bot", text: aiResponse, type: selectedPdfFile ? "pdf_analysis" : command }
+      ];
+      setMessages(updatedMessages);
+      
+      // Save to database
+      const chatTitle = selectedPdfFile ? `PDF: ${selectedPdfFile.name}` : userMessage.substring(0, 50);
+      saveChatToDb(updatedMessages, chatTitle);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      const updatedMessages = [
+        ...newMessages,
+        { sender: "bot", text: `Error: ${error.message}`, type: "error" }
+      ];
+      setMessages(updatedMessages);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createNewChat = () => {
@@ -245,6 +321,8 @@ const ChatBot = forwardRef((props, ref) => {
     setInput("");
     setStarted(false);
     setCurrentChatId(null);
+    setPdfLoaded(false);
+    setSelectedPdfFile(null);  // Clear selected PDF
   };
 
   const deleteChat = async (chatId) => {
@@ -313,19 +391,38 @@ const ChatBot = forwardRef((props, ref) => {
               <div ref={messagesEndRef} />
             </div>
             <form className="chatbot-input-area" onSubmit={handleSend}>
-              <span className="chatbot-plus-symbol" onClick={() => document.getElementById('chatbot-file-input').click()}>+</span>
+              <span className="chatbot-plus-symbol" onClick={() => fileInputRef.current?.click()}>+</span>
               <input
+                ref={fileInputRef}
                 id="chatbot-file-input"
                 type="file"
+                accept=".pdf"
                 style={{ display: 'none' }}
-                onChange={e => {
-                  // You can handle the file here if needed
-                  // Example: const file = e.target.files[0];
-                }}
+                onChange={handlePDFUpload}
               />
+              {selectedPdfFile && (
+                <div style={{ 
+                  padding: "8px 12px", 
+                  backgroundColor: "#e3f2fd", 
+                  borderRadius: "4px", 
+                  fontSize: "0.9rem",
+                  marginBottom: "8px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}>
+                  <span>📄 {selectedPdfFile.name}</span>
+                  <span 
+                    onClick={() => setSelectedPdfFile(null)}
+                    style={{ cursor: "pointer", color: "#666" }}
+                  >
+                    ✕
+                  </span>
+                </div>
+              )}
               <input
                 type="text"
-                placeholder="Type your message..."
+                placeholder={selectedPdfFile ? "Type your question about the PDF..." : "Type your message..."}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 className="chatbot-input"
