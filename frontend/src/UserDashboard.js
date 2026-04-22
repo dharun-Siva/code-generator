@@ -2,12 +2,13 @@ import React from 'react';
 import ChatBot from './ChatBot';
 import Sidebar from './Sidebar';
 import { useRef, useState, useEffect } from 'react';
+import './UserDashboard.css';
 
 const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout }) => {
   const chatBotRef = useRef();
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
-  const [showAppNameInput, setShowAppNameInput] = useState(false);
+  const [showAppNameInput, setShowAppNameInput] = useState(true);
   const [appName, setAppName] = useState("");
   const [showOpenList, setShowOpenList] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +65,8 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
 
   // Handler to select a chat from sidebar
   const handleSelectChat = (chatId) => {
+    setShowAppNameInput(false);
+    setShowOpenList(false);
     setCurrentChatId(null);
     setTimeout(() => setCurrentChatId(chatId), 0);
   };
@@ -92,7 +95,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   };
 
   return (
-    <div style={{ position: 'relative', minHeight: 'calc(100vh - 72px)', display: 'flex' }}>
+    <div style={{ position: 'relative', display: 'flex', width: '100%', minHeight: 'calc(100vh - 100px)' }}>
       <Sidebar 
         user={user} 
         profileOpen={profileOpen} 
@@ -104,32 +107,38 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
       />
-      <div style={{ flex: 1, padding: '2rem', marginLeft: 220, minHeight: 'calc(100vh - 72px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ flex: 1, padding: '2rem', marginLeft: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
         {showAppNameInput ? (
-          <form onSubmit={handleCreateApp} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 400, background: '#fff', padding: 32, borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-            <label htmlFor="appName" style={{ fontWeight: 600, fontSize: 18, marginBottom: '2em' }}>Enter Application Name</label>
-            <input
-              id="appName"
-              type="text"
-              value={appName}
-              onChange={e => setAppName(e.target.value)}
-              placeholder="Application name"
-              autoFocus
-              style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: '2em', border: '1px solid #ccc', borderRadius: 4 }}
-            />
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button type="submit" style={{ fontSize: 16, padding: '6px 18px' }}>Create</button>
-              <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowAppNameInput(false); setAppName(""); }}>Cancel</button>
-              <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowAppNameInput(false); setShowOpenList(true); setSearchTerm(""); }}>Open</button>
+          <form onSubmit={handleCreateApp} className="app-form-container">
+            <div style={{ width: '100%' }}>
+              <div className="app-form-heading">Enter Application Name</div>
+              <div className="floating-label-group" style={{ width: '100%', marginBottom: '2em' }}>
+                <input
+                  id="appName"
+                  type="text"
+                  value={appName}
+                  onChange={e => setAppName(e.target.value)}
+                  className="floating-input"
+                  autoFocus
+                  style={{ marginBottom: 0 }}
+                  required
+                />
+                <label htmlFor="appName" className={appName ? 'floating-label filled' : 'floating-label'}>Application name</label>
+              </div>
+            </div>
+            <div className="app-form-button-group">
+              <button type="submit" className="app-form-btn-primary">Create</button>
+              <button type="button" className="app-form-btn-secondary" onClick={() => { setShowAppNameInput(false); setAppName(""); }}>Cancel</button>
+              <button type="button" className="app-form-btn-secondary" onClick={() => { setShowAppNameInput(false); setShowOpenList(true); setSearchTerm(""); }}>Open</button>
             </div>
           </form>
         ) : showOpenList ? (
-          <div style={{ width: 400, background: '#fff', padding: 32, borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="app-open-list-container">
             {searchTerm === "" ? (
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center', marginBottom: '2em' }}>
-                <span style={{ fontWeight: 600, fontSize: 18 }}>Select Application to Open</span>
+              <div className="app-open-list-header">
+                <span className="app-open-list-title">Select Application to Open</span>
                 <button
-                  style={{ background: 'none', border: 'none', marginLeft: 10, cursor: 'pointer', fontSize: 20 }}
+                  className="app-search-btn"
                   title="Search"
                   onClick={() => setSearchTerm(" ")}
                 >
@@ -143,20 +152,20 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Search applications..."
                 autoFocus
-                style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: '2em', border: '1px solid #ccc', borderRadius: 4 }}
+                className="app-search-input"
                 onBlur={() => { if (searchTerm.trim() === "") setSearchTerm(""); }}
               />
             )}
-            <div style={{ width: '100%', maxHeight: 200, overflowY: 'auto', marginBottom: '2em' }}>
+            <div className="app-chat-list">
               {chats.filter(chat => chat.title.toLowerCase().includes(searchTerm.trim().toLowerCase())).length === 0 ? (
-                <div style={{ color: '#888', textAlign: 'center' }}>No applications found.</div>
+                <div className="app-no-results">No applications found.</div>
               ) : (
                 chats
                   .filter(chat => chat.title.toLowerCase().includes(searchTerm.trim().toLowerCase()))
                   .map(chat => (
                     <div
                       key={chat.id}
-                      style={{ padding: '10px 0', borderBottom: '1px solid #eee', cursor: 'pointer', fontSize: 16 }}
+                      className="app-chat-item"
                       onClick={() => {
                         setShowOpenList(false);
                         setSearchTerm("");
@@ -168,9 +177,9 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
                   ))
               )}
             </div>
-            <button type="button" style={{ fontSize: 16, padding: '6px 18px' }} onClick={() => { setShowOpenList(false); setSearchTerm(""); }}>Cancel</button>
+            <button type="button" className="app-form-btn-secondary" onClick={() => { setShowOpenList(false); setShowAppNameInput(true); setSearchTerm(""); }}>Cancel</button>
           </div>
-        ) : (
+        ) : currentChatId ? (
           <div style={{ width: '100%' }}>
             <ChatBot 
               ref={chatBotRef} 
@@ -179,6 +188,30 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
               onChatSaved={handleChatSaved}
             />
           </div>
+        ) : (
+          <form onSubmit={handleCreateApp} className="app-form-container">
+            <div style={{ width: '100%' }}>
+              <div className="app-form-heading">Enter Application Name</div>
+              <div className="floating-label-group" style={{ width: '100%', marginBottom: '2em' }}>
+                <input
+                  id="appName"
+                  type="text"
+                  value={appName}
+                  onChange={e => setAppName(e.target.value)}
+                  className="floating-input"
+                  autoFocus
+                  style={{ marginBottom: 0 }}
+                  required
+                />
+                <label htmlFor="appName" className={appName ? 'floating-label filled' : 'floating-label'}>Application name</label>
+              </div>
+            </div>
+            <div className="app-form-button-group">
+              <button type="submit" className="app-form-btn-primary">Create</button>
+              <button type="button" className="app-form-btn-secondary" onClick={() => { setAppName(""); }}>Cancel</button>
+              <button type="button" className="app-form-btn-secondary" onClick={() => { setShowOpenList(true); setSearchTerm(""); }}>Open</button>
+            </div>
+          </form>
         )}
       </div>
     </div>

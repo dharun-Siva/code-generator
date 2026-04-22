@@ -2,10 +2,17 @@ html, body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
+
+* {
+  box-sizing: border-box;
+}
+
 .App {
-  min-height: 100vh;
+  min-height: auto;
   background: #fafbfc;
+  text-align: center;
 }
 
 header {
@@ -16,11 +23,8 @@ header {
   left: 0;
   width: 100%;
   z-index: 1000;
-  background: #f5f5f5;
+  background: #4666a3;
   box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-}
-.App {
-  text-align: center;
 }
 
 .App-logo {
@@ -53,17 +57,7 @@ header {
   from {
     transform: rotate(0deg);
   }
-    margin: 0;
-    padding: 0;
   to {
     transform: rotate(360deg);
   }
 }
-
-    margin: 0;
-    padding: 0;
-    top: 0;
-    left: 0;
-    right: 0;
-    position: relative;
-    z-index: 101;

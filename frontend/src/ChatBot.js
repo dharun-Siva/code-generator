@@ -14,21 +14,20 @@ const ChatBot = forwardRef((props, ref) => {
   const [selectedPdfFile, setSelectedPdfFile] = useState(null);  // Store selected PDF file
   
   // Chat list and user state
-  const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
-    // Load chat data when currentChatId prop changes
-    // Always load chat data on mount and when currentChatId prop changes
-    useEffect(() => {
-      if (props.currentChatId) {
-        setCurrentChatId(props.currentChatId);
-        loadChatData(props.currentChatId);
-      } else {
-        setCurrentChatId(null);
-        setMessages([]);
-        setStarted(false);
-      }
-      // eslint-disable-next-line
-    }, [props.currentChatId]);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
+  // Load chat data when currentChatId prop changes and user is loaded
+  useEffect(() => {
+    if (props.currentChatId && currentUserId) {
+      setCurrentChatId(props.currentChatId);
+      loadChatData(props.currentChatId, currentUserId);
+    } else if (!props.currentChatId) {
+      setCurrentChatId(null);
+      setMessages([]);
+      setStarted(false);
+    }
+    // eslint-disable-next-line
+  }, [props.currentChatId, currentUserId]);
   
   const messagesEndRef = useRef(null);
 
@@ -84,10 +83,11 @@ const ChatBot = forwardRef((props, ref) => {
   };
 
   // Load specific chat - exposed via ref
-  const loadChatData = async (chatId) => {
-    if (!currentUserId) return;
+  const loadChatData = async (chatId, userId = null) => {
+    const userIdToUse = userId || currentUserId;
+    if (!userIdToUse) return;
     try {
-      const response = await fetch(`${API_URL}/chats/${currentUserId}/${chatId}`);
+      const response = await fetch(`${API_URL}/chats/${userIdToUse}/${chatId}`);
       if (response.ok) {
         const chat = await response.json();
         setCurrentChatId(chatId);
@@ -350,19 +350,19 @@ const ChatBot = forwardRef((props, ref) => {
   };
 
   return (
-    <div className="chatbot-main" style={{ width: '100%', maxWidth: 600, margin: '0 auto', height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div className="chatbot-main" style={{ width: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {!started ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: "100%", maxWidth: 900, margin: "0 auto" }}>
-            <div style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "1rem", color: "#222", textAlign: "center" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: "100%", maxWidth: 900, margin: "0 auto", padding: '2rem' }}>
+            <div style={{ fontSize: "2.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4666a3", textAlign: "center" }}>
               💬 AI Code Generator Agent
             </div>
-            <div style={{ fontSize: "1rem", color: "#666", marginBottom: "2.5rem", textAlign: "center", maxWidth: 600 }}>
-              Ask me anything! I can help you create projects, write code, analyze code, and more.
+            <div style={{ fontSize: "1.05rem", color: "#666", marginBottom: "3rem", textAlign: "center", maxWidth: 600, lineHeight: '1.6' }}>
+              Ask me anything! I can help you create projects, write code, analyze code, and much more. Let's get started!
             </div>
-            <form className="chatbot-input-area" style={{ width: "100%" }} onSubmit={handleSend}>
+            <form className="chatbot-input-area" style={{ width: "100%", position: 'relative', bottom: 'auto', left: 'auto', maxWidth: '500px' }} onSubmit={handleSend}>
               <input
                 type="text"
-                placeholder="Ask anything..."
+                placeholder="Type your message..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 className="chatbot-input"
@@ -373,7 +373,7 @@ const ChatBot = forwardRef((props, ref) => {
           </div>
         ) : (
           <>
-            <div className="chatbot-messages" style={{ flex: 1 }}>
+            <div className="chatbot-messages" style={{ flex: 1, overflowY: 'auto', paddingBottom: '140px' }}>
               {messages.map((msg, idx) => (
                 msg.sender === 'user' ? (
                   <div key={idx} className="chatbot-message user">
@@ -381,14 +381,24 @@ const ChatBot = forwardRef((props, ref) => {
                   </div>
                 ) : (
                   <div key={idx} className="chatbot-message bot">
-                    <div className="chatbot-message-bot-text">
-                      {msg.text}
-                    </div>
-                    {msg.type && msg.type !== 'chat' && (
-                      <div style={{ fontSize: "0.75rem", color: "#999", marginTop: "0.5rem" }}>
-                        [{msg.type.toUpperCase()}]
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div className="chatbot-message-bot-text">
+                        {msg.text}
                       </div>
-                    )}
+                      {msg.type && msg.type !== 'chat' && (
+                        <div style={{ 
+                          fontSize: "0.75rem", 
+                          color: "#fff", 
+                          background: '#4666a3',
+                          padding: '0.3rem 0.8rem',
+                          borderRadius: '12px',
+                          width: 'fit-content',
+                          fontWeight: '500'
+                        }}>
+                          {msg.type.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               ))}

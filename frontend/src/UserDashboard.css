@@ -1,0 +1,225 @@
+/* Form container styling */
+.app-form-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 500px;
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.app-form-container:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Dialog heading styling */
+.app-form-heading {
+  font-weight: 700;
+  font-size: 1.35rem;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: #333;
+}
+
+/* Button group styling */
+.app-form-button-group {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  width: 100%;
+  flex-wrap: nowrap;
+  margin-top: 1.5rem;
+}
+
+/* Primary button styling */
+.app-form-btn-primary {
+  background: linear-gradient(135deg, #4666a3 0%, #375087 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 1rem 2.4rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(70, 102, 163, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.app-form-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  transition: left 0.3s ease;
+}
+
+.app-form-btn-primary:hover {
+  background: linear-gradient(135deg, #375087 0%, #2d4468 100%);
+  box-shadow: 0 6px 20px rgba(70, 102, 163, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px);
+}
+
+.app-form-btn-primary:hover::before {
+  left: 100%;
+}
+
+.app-form-btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(70, 102, 163, 0.15), 0 4px 15px rgba(70, 102, 163, 0.25);
+}
+
+.app-form-btn-primary:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(70, 102, 163, 0.3);
+}
+
+/* Secondary button styling */
+.app-form-btn-secondary {
+  background: linear-gradient(135deg, #4666a3 0%, #375087 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 1rem 2.4rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(70, 102, 163, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.app-form-btn-secondary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  transition: left 0.3s ease;
+}
+
+.app-form-btn-secondary:hover {
+  background: linear-gradient(135deg, #375087 0%, #2d4468 100%);
+  box-shadow: 0 6px 20px rgba(70, 102, 163, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px);
+}
+
+.app-form-btn-secondary:hover::before {
+  left: 100%;
+}
+
+.app-form-btn-secondary:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(70, 102, 163, 0.15), 0 4px 15px rgba(70, 102, 163, 0.25);
+}
+
+.app-form-btn-secondary:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(70, 102, 163, 0.3);
+}
+
+/* Open list container styling */
+.app-open-list-container {
+  width: 500px;
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Search header styling */
+.app-open-list-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 2em;
+}
+
+.app-open-list-title {
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.app-search-btn {
+  background: none;
+  border: none;
+  margin-left: 15px;
+  cursor: pointer;
+  font-size: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.app-search-btn:hover {
+  transform: scale(1.15);
+}
+
+/* Search input styling */
+.app-search-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  margin-bottom: 2em;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.app-search-input:focus {
+  outline: none;
+  border-color: #4666a3;
+  box-shadow: 0 0 0 3px rgba(70, 102, 163, 0.1);
+}
+
+/* Chat list styling */
+.app-chat-list {
+  width: 100%;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 2em;
+  border-radius: 8px;
+}
+
+.app-chat-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.app-chat-item:last-child {
+  border-bottom: none;
+}
+
+.app-chat-item:hover {
+  background-color: #f5f7fa;
+  padding-left: 8px;
+  color: #4666a3;
+  font-weight: 500;
+}
+
+.app-no-results {
+  color: #999;
+  text-align: center;
+  font-size: 0.95rem;
+}

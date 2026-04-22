@@ -1,19 +1,76 @@
+.sidebar-chat-status {
+  font-size: 0.75rem;
+  color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin-top: 0.3rem;
+  display: inline-block;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+
 
 
 .sidebar {
-  width: 220px;
-  background: #f5f5f5;
-  color: #222;
+  width: 260px;
+  background: #4666a3;
+  color: #fff;
   height: calc(100vh - 100px); /* header height */
-  padding-top: 2rem;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+  padding-top: 1.5rem;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   position: fixed;
   left: 0;
   top: 100px; /* header height */
-  overflow: hidden;
+  /* Remove overflow: hidden to allow button to overflow */
   z-index: 1000;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar.collapsed {
+  width: 64px;
+  padding-top: 1rem;
+}
+
+.sidebar.collapsed .sidebar-text,
+.sidebar.collapsed .sidebar-chat-title,
+.sidebar.collapsed .sidebar-chat-date,
+.sidebar.collapsed .sidebar-no-chats {
+  display: none;
+}
+
+.sidebar-toggle-btn {
+  position: fixed;
+  top: calc(50% + 50px); /* 50px for header offset */
+  /* left is set inline from JS */
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: linear-gradient(135deg, #4666a3 0%, #375087 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(70, 102, 163, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.sidebar-toggle-btn:hover {
+  background: linear-gradient(135deg, #5b7bd6 0%, #4b6dc4 100%);
+  box-shadow: 0 6px 16px rgba(70, 102, 163, 0.3);
+  transform: translateY(-50%) scale(1.08);
+}
+.sidebar-toggle-btn svg {
+  font-size: 1.2rem;
 }
 
 .sidebar-profile {
@@ -31,8 +88,9 @@
 
 /* Helper class for main content area to avoid sidebar overlap */
 .main-content-with-sidebar {
-  margin-left: 220px;
+  margin-left: 260px;
 }
+
 
 .sidebar ul {
   list-style: none;
@@ -43,56 +101,98 @@
 .sidebar li {
   display: flex;
   align-items: center;
-  padding: 1.2rem 1.5rem;
+  padding: 1rem 1.2rem;
   cursor: pointer;
-  transition: background 0.2s;
-  font-size: 1.1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 1rem;
+  border-radius: 8px;
+  margin: 0.5rem 0.8rem;
+  color: #e3eafc;
+  font-weight: 500;
+  position: relative;
 }
 
-.sidebar li:hover {
-  background: #f2f2f2;
+.sidebar li:hover, .sidebar li.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
+
+.sidebar li:hover::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #fff;
+  border-radius: 0 4px 4px 0;
+}
+
 
 .sidebar-icon {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   margin-right: 1rem;
+  color: #e3eafc;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
 }
+
+.sidebar li:hover .sidebar-icon {
+  color: #fff;
+  transform: scale(1.1);
+}
+
 
 .sidebar-text {
-  font-size: 1.1rem;
+  font-size: 1rem;
+  color: #fff;
+  letter-spacing: 0.01em;
+  font-weight: 500;
 }
 
+
+
 .sidebar-chat-list {
-  padding: 0.5rem;
-  max-height: 300px;
+  padding: 0.8rem;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  border-top: 1px solid #ddd;
-  margin: 0.5rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 1rem 0 0 0;
+  display: flex;
+  flex-direction: column;
 }
+
 
 .sidebar-no-chats {
   text-align: center;
-  color: #999;
-  padding: 1rem 0.5rem;
+  color: #e3eafc;
+  padding: 2rem 0.5rem;
   font-size: 0.9rem;
+  font-style: italic;
 }
+
 
 .sidebar-chat-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.8rem;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  padding: 0.9rem;
+  background: #3b5280;
+  border: 1px solid #5b7bd6;
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .sidebar-chat-item:hover {
-  background: #f9f9f9;
-  border-color: #0074d9;
+  background: #4666a3;
+  border-color: #e3eafc;
+  box-shadow: 0 4px 12px rgba(70, 102, 163, 0.25);
+  transform: translateY(-2px);
 }
 
 .sidebar-chat-item-content {
@@ -101,32 +201,58 @@
   cursor: pointer;
 }
 
+
 .sidebar-chat-title {
   font-size: 0.95rem;
-  font-weight: 500;
-  color: #222;
+  font-weight: 600;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
 }
 
 .sidebar-chat-date {
   font-size: 0.8rem;
-  color: #999;
+  color: #e3eafc;
 }
+
+/* Modern scrollbar styling for chat list */
+.sidebar-chat-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-chat-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-chat-list::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.sidebar-chat-list::-webkit-scrollbar-thumb:hover {
+  background: #4666a3;
+}
+
 
 .sidebar-chat-delete {
   background: transparent;
   border: none;
-  color: #999;
+  color: #e3eafc;
   cursor: pointer;
-  padding: 0.2rem 0.4rem;
+  padding: 0.3rem 0.5rem;
   margin-left: 0.5rem;
-  transition: color 0.2s;
-  font-size: 1rem;
+  transition: all 0.2s ease;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
 }
 
 .sidebar-chat-delete:hover {
-  color: #d9534f;
+  color: #ffb4b4;
+  background: rgba(255, 180, 180, 0.1);
 }

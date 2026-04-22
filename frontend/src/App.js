@@ -78,54 +78,86 @@ function App() {
 
   return (
     <div className="App">
-      {/* Header with profile dropdown */}
-      {user && (
-        <header style={{ height: '100px', background: '#f5f5f5', boxShadow: '0 2px 4px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
-          <span style={{ fontWeight: '900', fontSize: '2.5rem', letterSpacing: '3px', color: '#222', textTransform: 'uppercase', width: '100%', textAlign: 'center' }}>
-            CODE GENERATOR
-          </span>
-          <span
-            style={{
-              position: 'absolute',
-              right: 32,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: '1.5rem',
-              color: '#444',
-              cursor: 'pointer',
-              background: '#e0e0e0',
-              borderRadius: '50%',
-              width: 40,
-              height: 40,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.07)'
-            }}
-            title={user.email}
-            onClick={() => setProfileOpen((open) => !open)}
-            ref={profileRef}
-          >
-            👤
-            {profileOpen && (
-              <div style={{ position: 'absolute', right: 0, top: 50, background: '#fff', border: '1px solid #ddd', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', minWidth: 180, zIndex: 1000 }}>
-                <div style={{ padding: '1rem', borderBottom: '1px solid #eee', color: '#555' }}>
-                  <strong>{user.email}</strong>
-                  <div style={{ fontSize: '0.9em', color: '#888' }}>{user.role}</div>
-                </div>
-                <button onClick={handleLogout} style={{ width: '100%', padding: '0.7rem', border: 'none', background: 'none', color: '#d32f2f', fontWeight: 'bold', cursor: 'pointer', borderRadius: '0 0 6px 6px' }}>Logout</button>
+      {user ? (
+        <>
+          {/* Header with profile dropdown */}
+          <header style={{ height: '100px', background: 'linear-gradient(135deg, #4666a3 0%, #375087 100%)', boxShadow: '0 4px 16px rgba(70, 102, 163, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
+            <span style={{ fontWeight: '900', fontSize: '2.5rem', letterSpacing: '3px', color: '#fff', textTransform: 'uppercase', width: '100%', textAlign: 'center' }}>
+              CODE GENERATOR
+            </span>
+            <div style={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1100, cursor: 'pointer' }}>
+              <div 
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  border: '2px solid rgba(255, 255, 255, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.3rem',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+                  e.currentTarget.style.border = '2px solid rgba(255, 255, 255, 0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.border = '2px solid rgba(255, 255, 255, 0.4)';
+                }}
+              >
+                <span>👤</span>
               </div>
-            )}
-          </span>
-        </header>
-      )}
-      <div style={{ marginTop: user ? '100px' : 0 }}>
+              <span
+                style={{
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 500,
+                  maxWidth: 160,
+                  textAlign: 'left',
+                  wordBreak: 'break-all',
+                  transition: 'opacity 0.2s ease'
+                }}
+                title={user.email}
+                onClick={() => setProfileOpen((open) => !open)}
+                ref={profileRef}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                {user.email}
+              </span>
+              {/* Dropdown remains unchanged */}
+              {profileOpen && (
+                <div
+                  style={{ position: 'absolute', right: 0, top: 60, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', minWidth: 240, zIndex: 1000, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                  onMouseDown={e => e.stopPropagation()}
+                >
+                  <div style={{ padding: '1.2rem', borderBottom: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #4666a3 0%, #375087 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', marginBottom: '0.8rem' }}>👤</div>
+                    <span style={{ fontWeight: 600, color: '#2c3e50', fontSize: '0.95rem', wordBreak: 'break-all' }}>{user.email}</span>
+                    <span style={{ fontSize: '0.85em', color: '#7f8c8d', marginTop: 4 }}>Role: <strong>{user.role}</strong></span>
+                  </div>
+                  <button onClick={handleLogout} style={{ width: '100%', padding: '0.9rem 1.2rem', border: 'none', background: 'none', color: '#d32f2f', fontWeight: '600', cursor: 'pointer', textAlign: 'left', transition: 'background 0.2s ease', fontSize: '0.95rem' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(211, 47, 47, 0.08)'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>🚪 Logout</button>
+                </div>
+              )}
+            </div>
+          </header>
+          <div style={{ marginTop: '100px' }}>
+            <Routes>
+              <Route path="/admin" element={<AdminDashboard user={user} onLogout={handleLogout} />} />
+              <Route path="/user" element={<UserDashboard user={user} onLogout={handleLogout} profileOpen={sidebarProfileOpen} setProfileOpen={setSidebarProfileOpen} profileRef={sidebarProfileRef} />} />
+            </Routes>
+          </div>
+        </>
+      ) : (
         <Routes>
-        <Route path="/admin" element={<AdminDashboard user={user} onLogout={handleLogout} />} />
-        <Route path="/user" element={<UserDashboard user={user} onLogout={handleLogout} profileOpen={sidebarProfileOpen} setProfileOpen={setSidebarProfileOpen} profileRef={sidebarProfileRef} />} />
-        <Route path="/" element={<AuthPage onAuth={handleAuth} />} />
+          <Route path="/" element={<AuthPage onAuth={handleAuth} />} />
         </Routes>
-      </div>
+      )}
     </div>
   );
 }
