@@ -134,28 +134,36 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
           </form>
         ) : showOpenList ? (
           <div className="app-open-list-container">
-            {searchTerm === "" ? (
-              <div className="app-open-list-header">
+            <div className="app-search-container">
+              <div className="app-search-header">
                 <span className="app-open-list-title">Select Application to Open</span>
-                <button
-                  className="app-search-btn"
-                  title="Search"
-                  onClick={() => setSearchTerm(" ")}
-                >
-                  🔍
-                </button>
               </div>
-            ) : (
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search applications..."
-                autoFocus
-                className="app-search-input"
-                onBlur={() => { if (searchTerm.trim() === "") setSearchTerm(""); }}
-              />
-            )}
+              <div className="app-search-wrapper">
+                <svg className="app-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Search applications..."
+                  autoFocus
+                  className="app-search-input-advanced"
+                  onFocus={() => setSearchTerm(searchTerm || " ")}
+                  onBlur={() => { if (searchTerm.trim() === "") setSearchTerm(""); }}
+                />
+                {searchTerm.trim() !== "" && (
+                  <button
+                    className="app-search-clear"
+                    onClick={() => setSearchTerm("")}
+                    type="button"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="app-chat-list">
               {chats.filter(chat => chat.title.toLowerCase().includes(searchTerm.trim().toLowerCase())).length === 0 ? (
                 <div className="app-no-results">No applications found.</div>

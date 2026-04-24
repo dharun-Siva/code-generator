@@ -48,6 +48,31 @@ def authenticate_user(db: Session, email: str, password: str):
         return None
     return user
 
+def change_password(db: Session, email: str, current_password: str, new_password: str):
+    """Change user password"""
+    user = get_user_by_email(db, email)
+    if not user:
+        return False, "User not found"
+    
+    # Verify current password
+    current_password = current_password[:72]
+    if not pwd_context.verify(current_password, user.hashed_password):
+        return False, "Current password is incorrect"
+    
+    # Hash new password
+    new_password = new_password[:72]
+    user.hashed_password = pwd_context.hash(new_password)
+    
+    try:
+        db.commit()
+        db.refresh(user)
+        logging.info(f"Password changed for user: {user.email}")
+        return True, "Password changed successfully"
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error changing password: {e}")
+        return False, str(e)
+
 
 # ==================== CHAT CRUD OPERATIONS ====================
 

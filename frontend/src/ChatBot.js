@@ -12,6 +12,7 @@ const ChatBot = forwardRef((props, ref) => {
   const [selectedModel, setSelectedModel] = useState("llama-3.1-8b-instant");
   const [pdfLoaded, setPdfLoaded] = useState(false);  // Track if PDF is loaded
   const [selectedPdfFile, setSelectedPdfFile] = useState(null);  // Store selected PDF file
+  const [showPdfName, setShowPdfName] = useState(false);  // Toggle to show PDF name
   
   // Chat list and user state
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -368,7 +369,7 @@ const ChatBot = forwardRef((props, ref) => {
                 className="chatbot-input"
                 autoFocus
               />
-              <button type="submit" className="chatbot-send-btn">Send</button>
+              <button type="submit" className="chatbot-send-btn">➤</button>
             </form>
           </div>
         ) : (
@@ -381,7 +382,7 @@ const ChatBot = forwardRef((props, ref) => {
                   </div>
                 ) : (
                   <div key={idx} className="chatbot-message bot">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
                       <div className="chatbot-message-bot-text">
                         {msg.text}
                       </div>
@@ -389,13 +390,26 @@ const ChatBot = forwardRef((props, ref) => {
                         <div style={{ 
                           fontSize: "0.75rem", 
                           color: "#fff", 
-                          background: '#4666a3',
-                          padding: '0.3rem 0.8rem',
+                          background: msg.type === 'pdf_analysis' 
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            : '#4666a3',
+                          padding: '0.4rem 0.9rem',
                           borderRadius: '12px',
                           width: 'fit-content',
-                          fontWeight: '500'
+                          fontWeight: '600',
+                          letterSpacing: '0.3px',
+                          boxShadow: msg.type === 'pdf_analysis' 
+                            ? '0 4px 12px rgba(102, 126, 234, 0.25)'
+                            : '0 2px 6px rgba(70, 102, 163, 0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          textTransform: 'uppercase'
                         }}>
-                          {msg.type.toUpperCase()}
+                          {msg.type === 'pdf_analysis' && <span>📄</span>}
+                          {msg.type === 'create' && <span>✨</span>}
+                          {msg.type === 'analyze' && <span>🔍</span>}
+                          {msg.type.replace('_', ' ')}
                         </div>
                       )}
                     </div>
@@ -424,23 +438,125 @@ const ChatBot = forwardRef((props, ref) => {
                 onChange={handlePDFUpload}
               />
               {selectedPdfFile && (
-                <div style={{ 
-                  padding: "8px 12px", 
-                  backgroundColor: "#e3f2fd", 
-                  borderRadius: "4px", 
-                  fontSize: "0.9rem",
-                  marginBottom: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}>
-                  <span>📄 {selectedPdfFile.name}</span>
-                  <span 
-                    onClick={() => setSelectedPdfFile(null)}
-                    style={{ cursor: "pointer", color: "#666" }}
+                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                  {/* Circle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPdfName(!showPdfName)}
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.6rem',
+                      boxShadow: '0 6px 20px rgba(102, 126, 234, 0.35)',
+                      transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'scale(1.15) translateY(-3px)';
+                      e.target.style.boxShadow = '0 10px 30px rgba(102, 126, 234, 0.45)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'scale(1)';
+                      e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.35)';
+                    }}
                   >
-                    ✕
-                  </span>
+                    📄
+                  </button>
+
+                  {/* PDF Name Tooltip */}
+                  {showPdfName && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '110%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#fff',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      fontSize: '0.88rem',
+                      whiteSpace: 'nowrap',
+                      marginBottom: '12px',
+                      boxShadow: '0 8px 24px rgba(102, 126, 234, 0.35), 0 0 1px rgba(0, 0, 0, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      animation: 'popIn 0.3s ease',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      fontWeight: '600'
+                    }}>
+                      <span style={{ 
+                        maxWidth: '200px', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ fontSize: '1rem' }}>✓</span>
+                        {selectedPdfFile.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPdfFile(null);
+                          setShowPdfName(false);
+                        }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          border: 'none',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '1rem',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: '28px',
+                          minHeight: '28px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'rgba(255, 255, 255, 0.35)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'rgba(255, 255, 255, 0.25)';
+                          e.target.style.transform = 'scale(1)';
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Arrow pointer */}
+                  {showPdfName && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '102%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderTop: '8px solid rgba(102, 126, 234, 0.5)',
+                      zIndex: 1001,
+                      animation: 'popIn 0.3s ease'
+                    }} />
+                  )}
                 </div>
               )}
               <input
@@ -452,7 +568,7 @@ const ChatBot = forwardRef((props, ref) => {
                 disabled={loading}
               />
               <button type="submit" className="chatbot-send-btn" disabled={loading}>
-                {loading ? "..." : "Send"}
+                {loading ? <span style={{ animation: 'pulse 1.5s infinite' }}>●</span> : "➤"}
               </button>
             </form>
           </>

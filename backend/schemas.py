@@ -13,6 +13,11 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class ChangePassword(BaseModel):
+    email: EmailStr
+    current_password: str
+    new_password: str
+
 class UserOut(UserBase):
     id: int
     class Config:

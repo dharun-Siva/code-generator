@@ -71,6 +71,17 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     return db_user
 
+@app.post("/change-password")
+def change_password(
+    change_pwd: schemas.ChangePassword,
+    db: Session = Depends(get_db)
+):
+    """Change user password"""
+    success, message = crud.change_password(db, change_pwd.email, change_pwd.current_password, change_pwd.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"message": message}
+
 
 # ==================== AI AGENT ENDPOINTS ====================
 
