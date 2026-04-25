@@ -17,15 +17,12 @@ const ChatBot = forwardRef((props, ref) => {
   // Chat list and user state
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
+  
   // Load chat data when currentChatId prop changes and user is loaded
   useEffect(() => {
     if (props.currentChatId && currentUserId) {
       setCurrentChatId(props.currentChatId);
       loadChatData(props.currentChatId, currentUserId);
-    } else if (!props.currentChatId) {
-      setCurrentChatId(null);
-      setMessages([]);
-      setStarted(false);
     }
     // eslint-disable-next-line
   }, [props.currentChatId, currentUserId]);
@@ -69,6 +66,14 @@ const ChatBot = forwardRef((props, ref) => {
       }
     }
   }, [props.user]);
+
+  // Load chat when both userId and chatId are available
+  useEffect(() => {
+    if (props.currentChatId && currentUserId) {
+      loadChatData(props.currentChatId, currentUserId);
+    }
+    // eslint-disable-next-line
+  }, [currentUserId]);
 
   // Load user chats
   const loadUserChats = async (userId) => {
@@ -190,10 +195,8 @@ const ChatBot = forwardRef((props, ref) => {
   }));
 
   useEffect(() => {
-    if (started) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, started, loading]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   const detectCommand = (text) => {
     const lowerText = text.toLowerCase();
@@ -352,81 +355,59 @@ const ChatBot = forwardRef((props, ref) => {
 
   return (
     <div className="chatbot-main" style={{ width: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {!started ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: "100%", maxWidth: 900, margin: "0 auto", padding: '2rem' }}>
-            <div style={{ fontSize: "2.5rem", fontWeight: 700, marginBottom: "1rem", color: "#4666a3", textAlign: "center" }}>
-              💬 AI Code Generator Agent
-            </div>
-            <div style={{ fontSize: "1.05rem", color: "#666", marginBottom: "3rem", textAlign: "center", maxWidth: 600, lineHeight: '1.6' }}>
-              Ask me anything! I can help you create projects, write code, analyze code, and much more. Let's get started!
-            </div>
-            <form className="chatbot-input-area" style={{ width: "100%", position: 'relative', bottom: 'auto', left: 'auto', maxWidth: '500px' }} onSubmit={handleSend}>
-              <input
-                type="text"
-                placeholder="Type your message..."
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                className="chatbot-input"
-                autoFocus
-              />
-              <button type="submit" className="chatbot-send-btn">➤</button>
-            </form>
-          </div>
-        ) : (
-          <>
-            <div className="chatbot-messages" style={{ flex: 1, overflowY: 'auto', paddingBottom: '140px' }}>
-              {messages.map((msg, idx) => (
-                msg.sender === 'user' ? (
-                  <div key={idx} className="chatbot-message user">
-                    <span className="chatbot-message-user-text">{msg.text}</span>
+        <div className="chatbot-messages" style={{ flex: 1, overflowY: 'auto', paddingBottom: '140px' }}>
+          {messages.map((msg, idx) => (
+            msg.sender === 'user' ? (
+              <div key={idx} className="chatbot-message user">
+                <span className="chatbot-message-user-text">{msg.text}</span>
+              </div>
+            ) : (
+              <div key={idx} className="chatbot-message bot">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                  <div className="chatbot-message-bot-text">
+                    {msg.text}
                   </div>
-                ) : (
-                  <div key={idx} className="chatbot-message bot">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                      <div className="chatbot-message-bot-text">
-                        {msg.text}
-                      </div>
-                      {msg.type && msg.type !== 'chat' && (
-                        <div style={{ 
-                          fontSize: "0.75rem", 
-                          color: "#fff", 
-                          background: msg.type === 'pdf_analysis' 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                            : '#4666a3',
-                          padding: '0.4rem 0.9rem',
-                          borderRadius: '12px',
-                          width: 'fit-content',
-                          fontWeight: '600',
-                          letterSpacing: '0.3px',
-                          boxShadow: msg.type === 'pdf_analysis' 
-                            ? '0 4px 12px rgba(102, 126, 234, 0.25)'
-                            : '0 2px 6px rgba(70, 102, 163, 0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          textTransform: 'uppercase'
-                        }}>
-                          {msg.type === 'pdf_analysis' && <span>📄</span>}
-                          {msg.type === 'create' && <span>✨</span>}
-                          {msg.type === 'analyze' && <span>🔍</span>}
-                          {msg.type.replace('_', ' ')}
-                        </div>
-                      )}
+                  {msg.type && msg.type !== 'chat' && (
+                    <div style={{ 
+                      fontSize: "0.75rem", 
+                      color: "#fff", 
+                      background: msg.type === 'pdf_analysis' 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                        : '#4666a3',
+                      padding: '0.4rem 0.9rem',
+                      borderRadius: '12px',
+                      width: 'fit-content',
+                      fontWeight: '600',
+                      letterSpacing: '0.3px',
+                      boxShadow: msg.type === 'pdf_analysis' 
+                        ? '0 4px 12px rgba(102, 126, 234, 0.25)'
+                        : '0 2px 6px rgba(70, 102, 163, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      textTransform: 'uppercase'
+                    }}>
+                      {msg.type === 'pdf_analysis' && <span>📄</span>}
+                      {msg.type === 'create' && <span>✨</span>}
+                      {msg.type === 'analyze' && <span>🔍</span>}
+                      {msg.type.replace('_', ' ')}
                     </div>
-                  </div>
-                )
-              ))}
-              {loading && (
-                <div className="chatbot-message bot">
-                  <div className="chatbot-typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
+                  )}
                 </div>
-              )}
-              <div ref={messagesEndRef} />
+              </div>
+            )
+          ))}
+          {loading && (
+            <div className="chatbot-message bot">
+              <div className="chatbot-typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
             </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
             <form className="chatbot-input-area" onSubmit={handleSend}>
               <span className="chatbot-plus-symbol" onClick={() => fileInputRef.current?.click()}>+</span>
               <input
@@ -571,8 +552,6 @@ const ChatBot = forwardRef((props, ref) => {
                 {loading ? <span style={{ animation: 'pulse 1.5s infinite' }}>●</span> : "➤"}
               </button>
             </form>
-          </>
-        )}
       </div>
   );
 });

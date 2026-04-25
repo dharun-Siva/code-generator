@@ -67,8 +67,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   const handleSelectChat = (chatId) => {
     setShowAppNameInput(false);
     setShowOpenList(false);
-    setCurrentChatId(null);
-    setTimeout(() => setCurrentChatId(chatId), 0);
+    setCurrentChatId(chatId);
   };
 
   // Handler to delete a chat
