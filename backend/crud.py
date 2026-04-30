@@ -123,3 +123,145 @@ def delete_chat(db: Session, chat_id: int, user_id: int):
         db.commit()
         return True
     return False
+
+
+# ==================== DOCUMENT CRUD OPERATIONS ====================
+
+def create_document(db: Session, user_id: int, filename: str, total_pages: int = 0):
+    """Create a new document"""
+    db_document = models.Document(
+        user_id=user_id,
+        filename=filename,
+        total_pages=total_pages,
+        status="uploaded"
+    )
+    db.add(db_document)
+    db.commit()
+    db.refresh(db_document)
+    return db_document
+
+def get_document(db: Session, document_id: int, user_id: int):
+    """Get a specific document (verify ownership)"""
+    return db.query(models.Document).filter(
+        models.Document.id == document_id,
+        models.Document.user_id == user_id
+    ).first()
+
+def get_user_documents(db: Session, user_id: int):
+    """Get all documents for a user"""
+    return db.query(models.Document).filter(
+        models.Document.user_id == user_id
+    ).order_by(models.Document.created_at.desc()).all()
+
+def update_document_status(db: Session, document_id: int, status: str):
+    """Update document processing status"""
+    db_document = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if db_document:
+        db_document.status = status
+        db.commit()
+        db.refresh(db_document)
+    return db_document
+
+def delete_document(db: Session, document_id: int, user_id: int):
+    """Delete a document and all related epics/stories"""
+    db_document = get_document(db, document_id, user_id)
+    if db_document:
+        db.delete(db_document)
+        db.commit()
+        return True
+    return False
+
+
+# ==================== EPIC CRUD OPERATIONS ====================
+
+def create_epic(db: Session, document_id: int, epic: schemas.EpicCreate):
+    """Create a new epic for a document"""
+    db_epic = models.Epic(
+        document_id=document_id,
+        title=epic.title,
+        description=epic.description,
+        page_range=epic.page_range,
+        priority=epic.priority
+    )
+    db.add(db_epic)
+    db.commit()
+    db.refresh(db_epic)
+    return db_epic
+
+def get_epic(db: Session, epic_id: int):
+    """Get a specific epic"""
+    return db.query(models.Epic).filter(models.Epic.id == epic_id).first()
+
+def get_document_epics(db: Session, document_id: int):
+    """Get all epics for a document"""
+    return db.query(models.Epic).filter(
+        models.Epic.document_id == document_id
+    ).order_by(models.Epic.created_at.desc()).all()
+
+def update_epic(db: Session, epic_id: int, epic_update: schemas.EpicUpdate):
+    """Update an epic"""
+    db_epic = get_epic(db, epic_id)
+    if db_epic:
+        update_data = epic_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_epic, field, value)
+        db.commit()
+        db.refresh(db_epic)
+    return db_epic
+
+def delete_epic(db: Session, epic_id: int):
+    """Delete an epic"""
+    db_epic = get_epic(db, epic_id)
+    if db_epic:
+        db.delete(db_epic)
+        db.commit()
+        return True
+    return False
+
+
+# ==================== STORY CRUD OPERATIONS ====================
+
+def create_story(db: Session, epic_id: int, story: schemas.StoryCreate):
+    """Create a new story for an epic"""
+    db_story = models.Story(
+        epic_id=epic_id,
+        title=story.title,
+        description=story.description,
+        acceptance_criteria=story.acceptance_criteria,
+        page_number=story.page_number,
+        story_points=story.story_points
+    )
+    db.add(db_story)
+    db.commit()
+    db.refresh(db_story)
+    return db_story
+
+def get_story(db: Session, story_id: int):
+    """Get a specific story"""
+    return db.query(models.Story).filter(models.Story.id == story_id).first()
+
+def get_epic_stories(db: Session, epic_id: int):
+    """Get all stories for an epic"""
+    return db.query(models.Story).filter(
+        models.Story.epic_id == epic_id
+    ).order_by(models.Story.created_at.desc()).all()
+
+def update_story(db: Session, story_id: int, story_update: schemas.StoryUpdate):
+    """Update a story"""
+    db_story = get_story(db, story_id)
+    if db_story:
+        update_data = story_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_story, field, value)
+        db.commit()
+        db.refresh(db_story)
+    return db_story
+
+def delete_story(db: Session, story_id: int):
+    """Delete a story"""
+    db_story = get_story(db, story_id)
+    if db_story:
+        db.delete(db_story)
+        db.commit()
+        return True
+    return False

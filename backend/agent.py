@@ -247,3 +247,171 @@ class AIAgent:
     def reset_pdf(self):
         """Clear the stored PDF content"""
         self.current_pdf_content = None
+    
+    def extract_pages_from_pdf(self, pdf_content: bytes) -> list:
+        """Extract text from each page of PDF individually"""
+        try:
+            pdf_file = BytesIO(pdf_content)
+            reader = PdfReader(pdf_file)
+            pages_data = []
+            
+            for page_num, page in enumerate(reader.pages, 1):
+                page_text = page.extract_text()
+                if page_text.strip():
+                    pages_data.append({
+                        "page_number": page_num,
+                        "content": page_text.strip()
+                    })
+            
+            return pages_data
+        except Exception as e:
+            print(f"ERROR in extract_pages_from_pdf: {str(e)}")
+            raise
+    
+    def generate_page_summary(self, page_content: str, page_number: int) -> dict:
+        """Generate summary and key points for a single page"""
+        try:
+            system_prompt = """You are an expert document analyst specialized in creating structured epics and stories.
+            Analyze the provided page and return a JSON response with:
+            {
+                "title": "Main topic/title of this page",
+                "summary": "Brief summary (2-3 sentences)",
+                "key_points": ["point1", "point2", "point3"],
+                "suggested_story_points": 5
+            }"""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Page {page_number} content:\n\n{page_content}"}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1024,
+            )
+            
+            import json
+            try:
+                result = json.loads(response.choices[0].message.content)
+            except json.JSONDecodeError:
+                result = {
+                    "title": f"Page {page_number} Content",
+                    "summary": response.choices[0].message.content,
+                    "key_points": [],
+                    "suggested_story_points": 5
+                }
+            
+            return result
+        except Exception as e:
+            print(f"ERROR in generate_page_summary: {str(e)}")
+            raise
+    
+    def generate_epic_structure(self, all_pages_summaries: list) -> dict:
+        """Generate hierarchical epic structure from page summaries"""
+        try:
+            summaries_text = ""
+            for summary in all_pages_summaries:
+                summaries_text += f"Page {summary['page_number']}: {summary['title']}\n"
+                summaries_text += f"Summary: {summary['summary']}\n"
+                summaries_text += f"Key Points: {', '.join(summary['key_points'])}\n\n"
+            
+            system_prompt = """You are an expert in agile methodology and story structure.
+            Based on the provided page summaries, create a hierarchical epic structure.
+            Return ONLY valid JSON (no markdown, no code blocks) with:
+            {
+                "epics": [
+                    {
+                        "title": "Epic Name",
+                        "description": "Epic description",
+                        "priority": "High",
+                        "page_range": "1-5 or 1,3,5",
+                        "stories": [
+                            {
+                                "title": "Story Title",
+                                "description": "Story description",
+                                "acceptance_criteria": "Criteria list",
+                                "page_number": 1,
+                                "story_points": 5
+                            }
+                        ]
+                    }
+                ]
+            }
+            IMPORTANT: Return ONLY the JSON object, nothing else."""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Create epic structure from these page summaries:\n\n{summaries_text}"}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=4096,
+            )
+            
+            import json
+            raw_response = response.choices[0].message.content
+            print(f"DEBUG: Raw epic structure response (first 200 chars):\n{raw_response[:200]}")
+            
+            try:
+                # Try direct JSON parse first
+                result = json.loads(raw_response)
+                print(f"DEBUG: Successfully parsed JSON directly")
+            except json.JSONDecodeError:
+                print(f"DEBUG: Direct JSON parse failed, trying to remove markdown...")
+                # Try removing markdown code blocks if present
+                if "```json" in raw_response:
+                    raw_response = raw_response.split("```json")[1].split("```")[0].strip()
+                    print(f"DEBUG: Removed ```json code block")
+                elif "```" in raw_response:
+                    raw_response = raw_response.split("```")[1].split("```")[0].strip()
+                    print(f"DEBUG: Removed ``` code block")
+                
+                try:
+                    result = json.loads(raw_response)
+                    print(f"DEBUG: Successfully parsed JSON after removing markdown")
+                except json.JSONDecodeError as e:
+                    print(f"ERROR: Failed to parse JSON: {e}")
+                    print(f"DEBUG: Response was:\n{raw_response[:500]}")
+                    result = {"epics": []}
+            
+            epics_count = len(result.get('epics', []))
+            print(f"DEBUG: Generated {epics_count} epics from structure")
+            return result
+        except Exception as e:
+            print(f"ERROR in generate_epic_structure: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def process_pdf_for_epics(self, pdf_content: bytes) -> dict:
+        """Complete workflow: Extract pages → Summarize → Generate epics"""
+        try:
+            # Step 1: Extract all pages
+            pages = self.extract_pages_from_pdf(pdf_content)
+            if not pages:
+                return {"error": "No pages extracted from PDF"}
+            
+            # Step 2: Generate summary for each page
+            all_summaries = []
+            for page_data in pages:
+                summary = self.generate_page_summary(page_data["content"], page_data["page_number"])
+                summary["page_number"] = page_data["page_number"]
+                all_summaries.append(summary)
+            
+            # Step 3: Generate epic structure from summaries
+            epic_structure = self.generate_epic_structure(all_summaries)
+            
+            return {
+                "total_pages": len(pages),
+                "page_summaries": all_summaries,
+                "epic_structure": epic_structure
+            }
+        except Exception as e:
+            print(f"ERROR in process_pdf_for_epics: {str(e)}")
+            traceback.print_exc()
+            raise

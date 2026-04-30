@@ -55,3 +55,95 @@ class ChatListOut(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Document Schemas
+class DocumentCreate(BaseModel):
+    filename: str
+
+class DocumentOut(BaseModel):
+    id: int
+    user_id: int
+    filename: str
+    total_pages: int
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Story Schemas
+class StoryCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    acceptance_criteria: Optional[str] = None
+    page_number: Optional[int] = None
+    story_points: int = 5
+
+class StoryUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    acceptance_criteria: Optional[str] = None
+    story_points: Optional[int] = None
+    status: Optional[str] = None
+
+class StoryOut(BaseModel):
+    id: int
+    epic_id: int
+    title: str
+    description: Optional[str]
+    acceptance_criteria: Optional[str]
+    page_number: Optional[int]
+    story_points: int
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Epic Schemas
+class EpicCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    page_range: Optional[str] = None
+    priority: str = "Medium"
+
+class EpicUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    page_range: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+
+class EpicOut(BaseModel):
+    id: int
+    document_id: int
+    title: str
+    description: Optional[str]
+    page_range: Optional[str]
+    priority: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class EpicWithStories(BaseModel):
+    id: int
+    document_id: int
+    title: str
+    description: Optional[str]
+    page_range: Optional[str]
+    priority: str
+    status: str
+    stories: List[StoryOut]
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True

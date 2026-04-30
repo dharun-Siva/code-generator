@@ -277,32 +277,53 @@ const ChatBot = forwardRef((props, ref) => {
       setLoading(true);
       let aiResponse;
       
-      // If PDF is selected, upload it with the question
+      // If PDF is selected, upload it to get AI analysis + generate epics
       if (selectedPdfFile) {
-        const formData = new FormData();
-        formData.append('file', selectedPdfFile);
+        console.log('Processing PDF:', selectedPdfFile.name);
         
-        // Encode the question as a URL parameter
+        // ========== REQUEST 1: Get AI text analysis for display ==========
+        const formData1 = new FormData();
+        formData1.append('file', selectedPdfFile);
+        
         const encodedQuestion = encodeURIComponent(userMessage.trim() || "");
-        const pdfUrl = `${API_URL}/agent/pdf/ask?question=${encodedQuestion}`;
+        const pdfAnalysisUrl = `${API_URL}/agent/pdf/ask?question=${encodedQuestion}`;
         
-        console.log('Sending PDF with question:', userMessage);
-        console.log('URL:', pdfUrl);
-        
-        const response = await fetch(pdfUrl, {
+        console.log('Step 1: Calling AI analysis endpoint...');
+        const analysisResponse = await fetch(pdfAnalysisUrl, {
           method: 'POST',
-          body: formData
+          body: formData1
         });
         
-        if (!response.ok) {
-          throw new Error('Failed to process PDF with question');
+        if (!analysisResponse.ok) {
+          throw new Error('Failed to analyze PDF');
         }
         
-        const data = await response.json();
-        aiResponse = data.response;
+        const analysisData = await analysisResponse.json();
+        aiResponse = analysisData.response;
+        console.log('Step 1 Complete: Got AI response');
         
-        // Mark PDF as loaded for follow-up questions
-        setPdfLoaded(true);
+        // ========== REQUEST 2: Save structured data to database (background) ==========
+        // Create a new FormData for the second request (first one is consumed)
+        const formData2 = new FormData();
+        formData2.append('file', selectedPdfFile);
+        
+        const epicUrl = `${API_URL}/epics/generate-from-pdf?user_id=${currentUserId}`;
+        
+        console.log('Step 2: Calling epic generation endpoint in background...');
+        fetch(epicUrl, {
+          method: 'POST',
+          body: formData2
+        })
+        .then(res => {
+          console.log('Epic generation response status:', res.status);
+          return res.json();
+        })
+        .then(data => {
+          console.log('Epics saved to database:', data);
+        })
+        .catch(err => {
+          console.error('Error saving epics:', err);
+        });
         
         // Clear the selected file after sending
         setSelectedPdfFile(null);
@@ -371,7 +392,9 @@ const ChatBot = forwardRef((props, ref) => {
                     <div style={{ 
                       fontSize: "0.75rem", 
                       color: "#fff", 
-                      background: msg.type === 'pdf_analysis' 
+                      background: msg.type === 'epic_generation' 
+                        ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                        : msg.type === 'pdf_analysis' 
                         ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
                         : '#4666a3',
                       padding: '0.4rem 0.9rem',
@@ -379,7 +402,9 @@ const ChatBot = forwardRef((props, ref) => {
                       width: 'fit-content',
                       fontWeight: '600',
                       letterSpacing: '0.3px',
-                      boxShadow: msg.type === 'pdf_analysis' 
+                      boxShadow: msg.type === 'epic_generation'
+                        ? '0 4px 12px rgba(17, 153, 142, 0.25)'
+                        : msg.type === 'pdf_analysis' 
                         ? '0 4px 12px rgba(102, 126, 234, 0.25)'
                         : '0 2px 6px rgba(70, 102, 163, 0.15)',
                       display: 'flex',
@@ -387,6 +412,7 @@ const ChatBot = forwardRef((props, ref) => {
                       gap: '6px',
                       textTransform: 'uppercase'
                     }}>
+                      {msg.type === 'epic_generation' && <span>📊</span>}
                       {msg.type === 'pdf_analysis' && <span>📄</span>}
                       {msg.type === 'create' && <span>✨</span>}
                       {msg.type === 'analyze' && <span>🔍</span>}
