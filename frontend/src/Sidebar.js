@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import './Sidebar.css';
 import { FaHome, FaChalkboardTeacher, FaUserGraduate, FaUsers, FaCalendarAlt, FaFileInvoiceDollar, FaBook, FaComments, FaUsersCog, FaUpload, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
-const Sidebar = ({ user, profileOpen, setProfileOpen, profileRef, onLogout, onNewChat, chats = [], onSelectChat, onDeleteChat }) => {
+const Sidebar = ({ user, profileOpen, setProfileOpen, profileRef, onLogout, onNewChat, chats = [], onSelectChat, onDeleteChat, onDashboard }) => {
   const [showChats, setShowChats] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -18,8 +18,12 @@ const Sidebar = ({ user, profileOpen, setProfileOpen, profileRef, onLogout, onNe
         {collapsed ? <FaChevronRight /> : <FaChevronLeft />}
       </button>
       <ul>
-        <li style={{ cursor: 'pointer' }} onClick={() => onNewChat()}>
+        <li style={{ cursor: 'pointer' }} onClick={() => onDashboard()}>
           <span className="sidebar-icon"><FaHome /></span>
+          {!collapsed && <span className="sidebar-text">Dashboard</span>}
+        </li>
+        <li style={{ cursor: 'pointer' }} onClick={() => onNewChat()}>
+          <span className="sidebar-icon"><FaChalkboardTeacher /></span>
           {!collapsed && <span className="sidebar-text">Create Application</span>}
         </li>
         <li style={{ cursor: 'pointer' }} onClick={() => setShowChats(!showChats)}>

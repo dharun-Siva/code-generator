@@ -303,3 +303,436 @@
   font-size: 0.95rem;
   padding: 40px 20px;
 }
+
+/* ===== APPLICATIONS DASHBOARD STYLES ===== */
+
+.apps-dashboard-container {
+  width: 100%;
+  max-width: 1200px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  animation: dashboardSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes dashboardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.apps-dashboard-header {
+  background: transparent;
+  padding: 40px 50px;
+  color: #333;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.apps-header-left {
+  flex: 1;
+}
+
+.apps-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.apps-header-search {
+  position: relative;
+  width: 250px;
+  display: flex;
+  align-items: center;
+}
+
+.apps-search-icon-header {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: #999;
+  pointer-events: none;
+  transition: color 0.3s ease;
+}
+
+.apps-header-search:focus-within .apps-search-icon-header {
+  color: #333;
+}
+
+.apps-search-input-header {
+  width: 100%;
+  padding: 12px 40px 12px 44px;
+  font-size: 0.95rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #f5f5f5;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  font-family: inherit;
+  color: #333;
+}
+
+.apps-search-input-header::placeholder {
+  color: #999;
+}
+
+.apps-search-input-header:focus {
+  outline: none;
+  border-color: #4666a3;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(70, 102, 163, 0.15);
+}
+
+.apps-search-clear-header {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.apps-search-clear-header:hover {
+  color: #333;
+  background: #e0e0e0;
+}
+
+/* Create button in header */
+.apps-create-btn-header {
+  background: white;
+  color: #4666a3;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.apps-create-btn-header:hover {
+  background: #f0f3f8;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.apps-create-btn-header:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.apps-dashboard-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.apps-dashboard-subtitle {
+  font-size: 1rem;
+  margin: 0;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+.apps-dashboard-content {
+  padding: 40px 50px;
+}
+
+.apps-list-section {
+  width: 100%;
+}
+
+.apps-list-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f2f5;
+}
+
+.apps-count {
+  font-size: 1rem;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Empty state styling */
+.apps-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+}
+
+.apps-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.apps-empty-text {
+  font-size: 1.1rem;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Table wrapper styling */
+.apps-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e8ecf1;
+  background: #f8f9fb;
+}
+
+/* Table styling */
+.apps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  table-layout: fixed;
+  border-spacing: 0;
+}
+
+.apps-table thead {
+  background: #f0f3f8;
+  border-bottom: 2px solid #d8dce5;
+}
+
+.apps-table th,
+.apps-table td {
+  padding: 16px 20px;
+  text-align: left;
+  margin: 0;
+  border: none;
+  box-sizing: border-box;
+}
+
+.apps-table th {
+  font-weight: 600;
+  color: #4a5568;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  height: auto;
+  vertical-align: top;
+}
+
+.apps-table td {
+  color: #2d3748;
+  word-break: break-word;
+  height: auto;
+  vertical-align: top;
+}
+
+.apps-table th:nth-child(1),
+.apps-table td:nth-child(1) {
+  width: 45%;
+}
+
+.apps-table th:nth-child(2),
+.apps-table td:nth-child(2) {
+  width: 30%;
+}
+
+.apps-table th:nth-child(3),
+.apps-table td:nth-child(3) {
+  width: 25%;
+  text-align: right;
+}
+
+.apps-table tbody tr {
+  border-bottom: 1px solid #e8ecf1;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fff;
+}
+
+.apps-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.apps-table tbody tr:hover {
+  background: linear-gradient(90deg, #f8faff 0%, #fafbff 100%);
+  box-shadow: inset 0 0 0 1px rgba(70, 102, 163, 0.1);
+}
+
+.app-name-cell {
+  font-weight: 500;
+  color: #1a202c;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.apps-table tbody tr:hover .app-name-cell {
+  color: #4666a3;
+}
+
+.app-date-cell {
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+.app-actions-cell {
+  text-align: right;
+}
+
+/* Action button styling */
+.apps-action-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.3px;
+}
+
+.apps-open-btn {
+  background: linear-gradient(135deg, #4666a3 0%, #375087 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(70, 102, 163, 0.2);
+}
+
+.apps-open-btn:hover {
+  background: linear-gradient(135deg, #375087 0%, #2d4468 100%);
+  box-shadow: 0 4px 12px rgba(70, 102, 163, 0.3);
+  transform: translateY(-2px);
+}
+
+.apps-open-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(70, 102, 163, 0.2);
+}
+
+/* Create button styling */
+.apps-create-btn {
+  background: linear-gradient(135deg, #4666a3 0%, #375087 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(70, 102, 163, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.apps-create-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(70, 102, 163, 0.1);
+  transition: left 0.3s ease;
+}
+
+.apps-create-btn:hover {
+  background: linear-gradient(135deg, #375087 0%, #2d4468 100%);
+  box-shadow: 0 6px 20px rgba(70, 102, 163, 0.3);
+  transform: translateY(-3px);
+}
+
+.apps-create-btn:hover::before {
+  left: 100%;
+}
+
+.apps-create-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(70, 102, 163, 0.15), 0 4px 15px rgba(70, 102, 163, 0.25);
+}
+
+.apps-create-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(70, 102, 163, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .apps-dashboard-header {
+    padding: 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+
+  .apps-header-left {
+    width: 100%;
+  }
+
+  .apps-header-right {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .apps-header-search {
+    width: 100%;
+  }
+
+  .apps-create-btn-header {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .apps-dashboard-title {
+    font-size: 1.5rem;
+  }
+
+  .apps-dashboard-content {
+    padding: 20px;
+  }
+
+  .app-name-cell {
+    max-width: 150px;
+  }
+
+  .apps-table th,
+  .apps-table td {
+    padding: 12px 10px;
+    font-size: 0.85rem;
+  }
+}
