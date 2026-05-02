@@ -115,6 +115,8 @@ def update_chat_title(db: Session, chat_id: int, user_id: int, title: str):
         db.refresh(db_chat)
     return db_chat
 
+
+
 def delete_chat(db: Session, chat_id: int, user_id: int):
     """Delete a chat"""
     db_chat = get_chat(db, chat_id, user_id)
@@ -125,143 +127,126 @@ def delete_chat(db: Session, chat_id: int, user_id: int):
     return False
 
 
-# ==================== DOCUMENT CRUD OPERATIONS ====================
+# ==================== PROJECT ITEMS CRUD OPERATIONS ====================
 
-def create_document(db: Session, user_id: int, filename: str, total_pages: int = 0):
-    """Create a new document"""
-    db_document = models.Document(
-        user_id=user_id,
-        filename=filename,
-        total_pages=total_pages,
-        status="uploaded"
-    )
-    db.add(db_document)
-    db.commit()
-    db.refresh(db_document)
-    return db_document
+def create_project_item(db: Session, project_item: schemas.ProjectItemCreate):
+    """Create a single epic or story entry in the project_items table"""
+    try:
+        db_entry = models.ProjectItem(
+            project_id=project_item.project_id,
+            user_id=project_item.user_id,
+            epic_id=project_item.epic_id,
+            story_id=project_item.story_id,
+            epic_title=project_item.epic_title,
+            story_title=project_item.story_title,
+            description=project_item.description
+        )
+        db.add(db_entry)
+        db.commit()
+        db.refresh(db_entry)
+        return db_entry
+    except Exception as e:
+        db.rollback()
+        raise Exception(f"Error creating project item: {str(e)}")
 
-def get_document(db: Session, document_id: int, user_id: int):
-    """Get a specific document (verify ownership)"""
-    return db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == user_id
+def batch_save_project_item(db: Session, batch_data: schemas.BatchSaveProjectItem):
+    """Save epic and multiple stories to the project_items table (titles only, no descriptions)"""
+    try:
+        created_entries = []
+        
+        print(f"DEBUG CRUD: Starting batch save for project_id={batch_data.project_id}")
+        
+        # Save the epic (story_id = 0 indicates this is an epic)
+        db_epic = models.ProjectItem(
+            project_id=batch_data.project_id,
+            user_id=batch_data.user_id,
+            epic_id=batch_data.epic_id,
+            story_id=0,  # 0 indicates epic
+            epic_title=batch_data.epic_title,  # Store epic title for consistency
+            story_title=None,  # No story title for epic entries
+            description=batch_data.epic_description  # STORE epic description
+        )
+        print(f"DEBUG CRUD: Adding epic entry: {batch_data.epic_title}")
+        db.add(db_epic)
+        created_entries.append(db_epic)
+        
+        # Save all stories
+        for idx, story in enumerate(batch_data.stories):
+            print(f"DEBUG CRUD: Adding story {idx+1}/{len(batch_data.stories)}: {story.get('story_title', '')}")
+            db_story = models.ProjectItem(
+                project_id=batch_data.project_id,
+                user_id=batch_data.user_id,
+                epic_id=batch_data.epic_id,
+                story_id=story.get("story_id", 0),
+                epic_title=batch_data.epic_title,  # Reference to parent epic
+                story_title=story.get("story_title", ""),  # Store story title ONLY
+                description=None  # Do NOT store description/acceptance criteria
+            )
+            db.add(db_story)
+            created_entries.append(db_story)
+        
+        print(f"DEBUG CRUD: Committing {len(created_entries)} entries to DB")
+        db.commit()
+        for entry in created_entries:
+            db.refresh(entry)
+        
+        print(f"DEBUG CRUD: Batch save completed successfully - Saved 1 Epic + {len(batch_data.stories)} Stories")
+        return created_entries
+    except Exception as e:
+        print(f"ERROR CRUD: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise Exception(f"Error batch saving project items: {str(e)}")
+
+def get_project_items_by_epic(db: Session, project_id: int, epic_id: int):
+    """Get all stories for a specific epic in a project"""
+    return db.query(models.ProjectItem).filter(
+        models.ProjectItem.project_id == project_id,
+        models.ProjectItem.epic_id == epic_id,
+        models.ProjectItem.story_id > 0  # Exclude the epic itself
+    ).order_by(models.ProjectItem.created_at.asc()).all()
+
+def get_project_epic(db: Session, project_id: int, epic_id: int):
+    """Get the epic entry for a specific project"""
+    return db.query(models.ProjectItem).filter(
+        models.ProjectItem.project_id == project_id,
+        models.ProjectItem.epic_id == epic_id,
+        models.ProjectItem.story_id == 0  # Get the epic itself
     ).first()
 
-def get_user_documents(db: Session, user_id: int):
-    """Get all documents for a user"""
-    return db.query(models.Document).filter(
-        models.Document.user_id == user_id
-    ).order_by(models.Document.created_at.desc()).all()
+def get_all_project_items(db: Session, project_id: int):
+    """Get all epics and stories for a project"""
+    return db.query(models.ProjectItem).filter(
+        models.ProjectItem.project_id == project_id
+    ).order_by(models.ProjectItem.epic_id.asc(), models.ProjectItem.story_id.asc()).all()
 
-def update_document_status(db: Session, document_id: int, status: str):
-    """Update document processing status"""
-    db_document = db.query(models.Document).filter(models.Document.id == document_id).first()
-    if db_document:
-        db_document.status = status
-        db.commit()
-        db.refresh(db_document)
-    return db_document
-
-def delete_document(db: Session, document_id: int, user_id: int):
-    """Delete a document and all related epics/stories"""
-    db_document = get_document(db, document_id, user_id)
-    if db_document:
-        db.delete(db_document)
+def delete_project_items_by_epic(db: Session, project_id: int, epic_id: int):
+    """Delete an epic and all its stories from the project"""
+    try:
+        db.query(models.ProjectItem).filter(
+            models.ProjectItem.project_id == project_id,
+            models.ProjectItem.epic_id == epic_id
+        ).delete()
         db.commit()
         return True
-    return False
+    except Exception as e:
+        db.rollback()
+        raise Exception(f"Error deleting project items: {str(e)}")
 
-
-# ==================== EPIC CRUD OPERATIONS ====================
-
-def create_epic(db: Session, document_id: int, epic: schemas.EpicCreate):
-    """Create a new epic for a document"""
-    db_epic = models.Epic(
-        document_id=document_id,
-        title=epic.title,
-        description=epic.description,
-        page_range=epic.page_range,
-        priority=epic.priority
-    )
-    db.add(db_epic)
-    db.commit()
-    db.refresh(db_epic)
-    return db_epic
-
-def get_epic(db: Session, epic_id: int):
-    """Get a specific epic"""
-    return db.query(models.Epic).filter(models.Epic.id == epic_id).first()
-
-def get_document_epics(db: Session, document_id: int):
-    """Get all epics for a document"""
-    return db.query(models.Epic).filter(
-        models.Epic.document_id == document_id
-    ).order_by(models.Epic.created_at.desc()).all()
-
-def update_epic(db: Session, epic_id: int, epic_update: schemas.EpicUpdate):
-    """Update an epic"""
-    db_epic = get_epic(db, epic_id)
-    if db_epic:
-        update_data = epic_update.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_epic, field, value)
-        db.commit()
-        db.refresh(db_epic)
-    return db_epic
-
-def delete_epic(db: Session, epic_id: int):
-    """Delete an epic"""
-    db_epic = get_epic(db, epic_id)
-    if db_epic:
-        db.delete(db_epic)
-        db.commit()
-        return True
-    return False
-
-
-# ==================== STORY CRUD OPERATIONS ====================
-
-def create_story(db: Session, epic_id: int, story: schemas.StoryCreate):
-    """Create a new story for an epic"""
-    db_story = models.Story(
-        epic_id=epic_id,
-        title=story.title,
-        description=story.description,
-        acceptance_criteria=story.acceptance_criteria,
-        page_number=story.page_number,
-        story_points=story.story_points
-    )
-    db.add(db_story)
-    db.commit()
-    db.refresh(db_story)
-    return db_story
-
-def get_story(db: Session, story_id: int):
-    """Get a specific story"""
-    return db.query(models.Story).filter(models.Story.id == story_id).first()
-
-def get_epic_stories(db: Session, epic_id: int):
-    """Get all stories for an epic"""
-    return db.query(models.Story).filter(
-        models.Story.epic_id == epic_id
-    ).order_by(models.Story.created_at.desc()).all()
-
-def update_story(db: Session, story_id: int, story_update: schemas.StoryUpdate):
-    """Update a story"""
-    db_story = get_story(db, story_id)
-    if db_story:
-        update_data = story_update.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_story, field, value)
-        db.commit()
-        db.refresh(db_story)
-    return db_story
-
-def delete_story(db: Session, story_id: int):
-    """Delete a story"""
-    db_story = get_story(db, story_id)
-    if db_story:
-        db.delete(db_story)
-        db.commit()
-        return True
-    return False
+def update_project_item(db: Session, entry_id: int, description: str):
+    """Update description of an epic or story entry"""
+    try:
+        db_entry = db.query(models.ProjectItem).filter(
+            models.ProjectItem.id == entry_id
+        ).first()
+        
+        if db_entry:
+            db_entry.description = description
+            db.commit()
+            db.refresh(db_entry)
+            return db_entry
+        return None
+    except Exception as e:
+        db.rollback()
+        raise Exception(f"Error updating project item: {str(e)}")

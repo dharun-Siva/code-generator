@@ -271,260 +271,99 @@ def delete_chat_endpoint(user_id: int, chat_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== DOCUMENT ENDPOINTS ====================
+# ==================== PROJECT ITEMS ENDPOINTS ====================
 
-@app.post("/documents", response_model=schemas.DocumentOut)
-def create_document(user_id: int, filename: str, db: Session = Depends(get_db)):
-    """Create a new document"""
+@app.post("/project-items/batch-save")
+def batch_save_project_items(batch_data: schemas.BatchSaveProjectItem, db: Session = Depends(get_db)):
+    """Save epic and multiple stories to project_items table when user approves"""
     try:
-        document = crud.create_document(db, user_id, filename)
-        return document
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/documents/{user_id}", response_model=list[schemas.DocumentOut])
-def get_user_documents(user_id: int, db: Session = Depends(get_db)):
-    """Get all documents for a user"""
-    try:
-        documents = crud.get_user_documents(db, user_id)
-        return documents
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/documents/{user_id}/{document_id}", response_model=schemas.DocumentOut)
-def get_document(user_id: int, document_id: int, db: Session = Depends(get_db)):
-    """Get a specific document"""
-    try:
-        document = crud.get_document(db, document_id, user_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return document
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/documents/{user_id}/{document_id}")
-def delete_document(user_id: int, document_id: int, db: Session = Depends(get_db)):
-    """Delete a document"""
-    try:
-        success = crud.delete_document(db, document_id, user_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return {"status": "Document deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== EPIC ENDPOINTS ====================
-
-@app.post("/epics", response_model=schemas.EpicOut)
-def create_epic(document_id: int, epic: schemas.EpicCreate, db: Session = Depends(get_db)):
-    """Create a new epic"""
-    try:
-        epic_obj = crud.create_epic(db, document_id, epic)
-        return epic_obj
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/epics/document/{document_id}", response_model=list[schemas.EpicOut])
-def get_document_epics(document_id: int, db: Session = Depends(get_db)):
-    """Get all epics for a document"""
-    try:
-        epics = crud.get_document_epics(db, document_id)
-        return epics
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/epics/{epic_id}", response_model=schemas.EpicWithStories)
-def get_epic_with_stories(epic_id: int, db: Session = Depends(get_db)):
-    """Get a specific epic with all its stories"""
-    try:
-        epic = crud.get_epic(db, epic_id)
-        if not epic:
-            raise HTTPException(status_code=404, detail="Epic not found")
-        return epic
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/epics/{epic_id}", response_model=schemas.EpicOut)
-def update_epic(epic_id: int, epic_update: schemas.EpicUpdate, db: Session = Depends(get_db)):
-    """Update an epic"""
-    try:
-        epic = crud.update_epic(db, epic_id, epic_update)
-        if not epic:
-            raise HTTPException(status_code=404, detail="Epic not found")
-        return epic
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/epics/{epic_id}")
-def delete_epic(epic_id: int, db: Session = Depends(get_db)):
-    """Delete an epic"""
-    try:
-        success = crud.delete_epic(db, epic_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Epic not found")
-        return {"status": "Epic deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== STORY ENDPOINTS ====================
-
-@app.post("/stories", response_model=schemas.StoryOut)
-def create_story(epic_id: int, story: schemas.StoryCreate, db: Session = Depends(get_db)):
-    """Create a new story"""
-    try:
-        story_obj = crud.create_story(db, epic_id, story)
-        return story_obj
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/stories/epic/{epic_id}", response_model=list[schemas.StoryOut])
-def get_epic_stories(epic_id: int, db: Session = Depends(get_db)):
-    """Get all stories for an epic"""
-    try:
-        stories = crud.get_epic_stories(db, epic_id)
-        return stories
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/stories/{story_id}", response_model=schemas.StoryOut)
-def get_story(story_id: int, db: Session = Depends(get_db)):
-    """Get a specific story"""
-    try:
-        story = crud.get_story(db, story_id)
-        if not story:
-            raise HTTPException(status_code=404, detail="Story not found")
-        return story
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/stories/{story_id}", response_model=schemas.StoryOut)
-def update_story(story_id: int, story_update: schemas.StoryUpdate, db: Session = Depends(get_db)):
-    """Update a story"""
-    try:
-        story = crud.update_story(db, story_id, story_update)
-        if not story:
-            raise HTTPException(status_code=404, detail="Story not found")
-        return story
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/stories/{story_id}")
-def delete_story(story_id: int, db: Session = Depends(get_db)):
-    """Delete a story"""
-    try:
-        success = crud.delete_story(db, story_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Story not found")
-        return {"status": "Story deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== EPIC GENERATION ENDPOINT ====================
-
-@app.post("/epics/generate-from-pdf")
-async def generate_epics_from_pdf(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Upload PDF and generate epic structure"""
-    try:
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        print(f"DEBUG: Received batch save request")
+        print(f"DEBUG: project_id={batch_data.project_id}, user_id={batch_data.user_id}")
+        print(f"DEBUG: epic_title={batch_data.epic_title}, stories_count={len(batch_data.stories)}")
         
-        print(f"\n{'='*60}")
-        print(f"DEBUG: Starting epic generation for file: {file.filename}")
-        print(f"DEBUG: User ID: {user_id}")
-        print(f"{'='*60}\n")
-        
-        # Read PDF file
-        pdf_content = await file.read()
-        print(f"DEBUG: PDF file read, size: {len(pdf_content)} bytes")
-        
-        # Create document record
-        document = crud.create_document(db, user_id, file.filename)
-        print(f"DEBUG: Created document record, ID: {document.id}")
-        
-        # Process PDF and generate epics
-        print(f"DEBUG: Starting PDF processing...")
-        result = agent.process_pdf_for_epics(pdf_content)
-        
-        print(f"DEBUG: PDF processing complete")
-        print(f"DEBUG: Total pages extracted: {result.get('total_pages', 0)}")
-        
-        # Update document with page count
-        document.total_pages = result.get("total_pages", 0)
-        document.status = "completed"
-        db.commit()
-        print(f"DEBUG: Document updated with page count")
-        
-        # Create epics from the generated structure
-        epic_structure = result.get("epic_structure", {})
-        print(f"DEBUG: Epic structure has {len(epic_structure.get('epics', []))} epics")
-        
-        created_epics = []
-        
-        for idx, epic_data in enumerate(epic_structure.get("epics", [])):
-            print(f"\nDEBUG: Processing epic {idx + 1}: {epic_data.get('title', 'Untitled')}")
-            
-            # Create epic
-            epic_create = schemas.EpicCreate(
-                title=epic_data.get("title", "Untitled"),
-                description=epic_data.get("description", ""),
-                page_range=epic_data.get("page_range", ""),
-                priority=epic_data.get("priority", "Medium")
-            )
-            epic = crud.create_epic(db, document.id, epic_create)
-            print(f"DEBUG: Created epic, ID: {epic.id}")
-            
-            # Create stories for this epic
-            stories_list = epic_data.get("stories", [])
-            print(f"DEBUG: Epic has {len(stories_list)} stories")
-            
-            for story_idx, story_data in enumerate(stories_list):
-                print(f"DEBUG: Creating story {story_idx + 1}: {story_data.get('title', 'Untitled')}")
-                
-                story_create = schemas.StoryCreate(
-                    title=story_data.get("title", "Untitled"),
-                    description=story_data.get("description", ""),
-                    acceptance_criteria=story_data.get("acceptance_criteria", ""),
-                    page_number=story_data.get("page_number"),
-                    story_points=story_data.get("story_points", 5)
-                )
-                crud.create_story(db, epic.id, story_create)
-                print(f"DEBUG: Story created")
-            
-            created_epics.append(epic)
-        
-        print(f"\nDEBUG: Total epics created: {len(created_epics)}")
-        print(f"{'='*60}\n")
+        entries = crud.batch_save_project_item(db, batch_data)
+        print(f"DEBUG: Successfully saved {len(entries)} entries")
         
         return {
-            "document_id": document.id,
-            "filename": file.filename,
-            "total_pages": result.get("total_pages", 0),
-            "epics_created": len(created_epics),
-            "status": "success"
+            "status": "success",
+            "message": f"Epic with {len(entries)-1} stories saved successfully",
+            "entries_count": len(entries),
+            "project_id": batch_data.project_id,
+            "epic_id": batch_data.epic_id
+        }
+    except Exception as e:
+        print(f"ERROR in batch_save: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/project-items")
+def create_single_project_item(project_item: schemas.ProjectItemCreate, db: Session = Depends(get_db)):
+    """Create a single epic or story entry"""
+    try:
+        entry = crud.create_project_item(db, project_item)
+        return entry
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/project-items/{project_id}/{epic_id}")
+def get_project_items_with_epic(project_id: int, epic_id: int, db: Session = Depends(get_db)):
+    """Get an epic and all its stories for a specific project"""
+    try:
+        epic = crud.get_project_epic(db, project_id, epic_id)
+        stories = crud.get_project_items_by_epic(db, project_id, epic_id)
+        
+        if not epic:
+            raise HTTPException(status_code=404, detail="Epic not found")
+        
+        return {
+            "epic": epic,
+            "stories": stories
         }
     except HTTPException:
         raise
     except Exception as e:
-        print(f"ERROR in generate_epics_from_pdf: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/project-items/{project_id}")
+def get_all_project_items(project_id: int, db: Session = Depends(get_db)):
+    """Get all epics and stories for a project"""
+    try:
+        entries = crud.get_all_project_items(db, project_id)
+        
+        # Group by epic_id
+        grouped = {}
+        for entry in entries:
+            if entry.epic_id not in grouped:
+                grouped[entry.epic_id] = {"epic": None, "stories": []}
+            
+            if entry.story_id == 0:
+                grouped[entry.epic_id]["epic"] = entry
+            else:
+                grouped[entry.epic_id]["stories"].append(entry)
+        
+        return {"project_id": project_id, "epics": grouped}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/project-items/{entry_id}")
+def update_project_item(entry_id: int, description: str, db: Session = Depends(get_db)):
+    """Update description of an epic or story"""
+    try:
+        entry = crud.update_project_item(db, entry_id, description)
+        if not entry:
+            raise HTTPException(status_code=404, detail="Entry not found")
+        return entry
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/project-items/{project_id}/{epic_id}")
+def delete_project_items_by_epic_endpoint(project_id: int, epic_id: int, db: Session = Depends(get_db)):
+    """Delete an epic and all its stories from a project"""
+    try:
+        crud.delete_project_items_by_epic(db, project_id, epic_id)
+        return {"status": "Epic and stories deleted successfully"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

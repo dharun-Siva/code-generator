@@ -415,3 +415,59 @@ class AIAgent:
             print(f"ERROR in process_pdf_for_epics: {str(e)}")
             traceback.print_exc()
             raise
+    
+    def generate_standardized_epic(self, pdf_text: str) -> str:
+        """Generate epic in standardized format for consistency across all users
+        
+        Returns standardized format:
+        **Epic: [Epic Name]**
+        Description: [Epic description]
+        **Stories:**
+        1. **[Story 1 Title]**
+           Description: [Story 1 description]
+        2. **[Story 2 Title]**
+           Description: [Story 2 description]
+        """
+        try:
+            system_prompt = """You are an expert in creating project epics and user stories in a STANDARDIZED format.
+
+IMPORTANT: Your response MUST follow this EXACT format:
+
+**Epic: [Epic Name]**
+Description: [2-3 sentence description of what this epic accomplishes]
+
+**Stories:**
+1. **[Story 1 Title]**
+   Description: [Clear description of what the user can do]
+
+2. **[Story 2 Title]**
+   Description: [Clear description of what the user can do]
+
+3. **[Story 3 Title]**
+   Description: [Clear description of what the user can do]
+
+RULES:
+- Use ** around Epic name and Story titles
+- Each story MUST start with a number (1., 2., 3., etc.)
+- Each story MUST have Description: on the next line
+- Be consistent and professional
+- Create 2-5 actionable stories under each epic
+- Do NOT use markdown code blocks or extra formatting"""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Based on this document, create an epic with stories in the standardized format:\n\n{pdf_text}"}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2048,
+            )
+            
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"ERROR in generate_standardized_epic: {str(e)}")
+            traceback.print_exc()
+            raise

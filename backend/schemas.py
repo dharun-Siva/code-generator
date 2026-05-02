@@ -57,93 +57,34 @@ class ChatListOut(BaseModel):
         from_attributes = True
 
 
-# Document Schemas
-class DocumentCreate(BaseModel):
-    filename: str
-
-class DocumentOut(BaseModel):
-    id: int
+# Project Item Schemas (formerly ProjectEpicStory)
+class ProjectItemCreate(BaseModel):
+    project_id: int  # Chat ID
     user_id: int
-    filename: str
-    total_pages: int
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
+    epic_id: int  # Epic counter
+    story_id: int  # Story counter
+    epic_title: str  # Epic name for consistency across all users
+    story_title: Optional[str] = None  # Story name
+    description: Optional[str] = None  # Not used - kept for backward compatibility
 
-
-# Story Schemas
-class StoryCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    acceptance_criteria: Optional[str] = None
-    page_number: Optional[int] = None
-    story_points: int = 5
-
-class StoryUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    acceptance_criteria: Optional[str] = None
-    story_points: Optional[int] = None
-    status: Optional[str] = None
-
-class StoryOut(BaseModel):
+class ProjectItemOut(BaseModel):
     id: int
+    project_id: int
+    user_id: int
     epic_id: int
-    title: str
-    description: Optional[str]
-    acceptance_criteria: Optional[str]
-    page_number: Optional[int]
-    story_points: int
-    status: str
+    story_id: int
+    description: str
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
 
-
-# Epic Schemas
-class EpicCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    page_range: Optional[str] = None
-    priority: str = "Medium"
-
-class EpicUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    page_range: Optional[str] = None
-    priority: Optional[str] = None
-    status: Optional[str] = None
-
-class EpicOut(BaseModel):
-    id: int
-    document_id: int
-    title: str
-    description: Optional[str]
-    page_range: Optional[str]
-    priority: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-class EpicWithStories(BaseModel):
-    id: int
-    document_id: int
-    title: str
-    description: Optional[str]
-    page_range: Optional[str]
-    priority: str
-    status: str
-    stories: List[StoryOut]
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
+class BatchSaveProjectItem(BaseModel):
+    """Save epic with description and multiple stories (without descriptions)"""
+    project_id: int  # Chat ID
+    user_id: int
+    epic_id: int
+    epic_title: str  # Epic name/title for consistency
+    epic_description: str  # STORE: Epic description only
+    stories: List[dict]  # List of {story_id: int, story_title: str} - NO descriptions

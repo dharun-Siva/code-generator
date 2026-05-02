@@ -14,6 +14,12 @@ const ChatBot = forwardRef((props, ref) => {
   const [selectedPdfFile, setSelectedPdfFile] = useState(null);  // Store selected PDF file
   const [showPdfName, setShowPdfName] = useState(false);  // Toggle to show PDF name
   
+  // Epic generation state
+  const [pendingEpic, setPendingEpic] = useState(null);  // Epic waiting for approval
+  const [pendingStories, setPendingStories] = useState([]);  // Stories waiting for approval
+  const [approvalMode, setApprovalMode] = useState(false);  // Whether in approval mode
+  const [currentDocumentId, setCurrentDocumentId] = useState(null);  // Document ID for saving
+  
   // Chat list and user state
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentChatId, setCurrentChatId] = useState(props.currentChatId || null);
@@ -232,6 +238,8 @@ const ChatBot = forwardRef((props, ref) => {
         await fetch(endpoint, { method: 'POST' });
         // Also reset PDF
         setPdfLoaded(false);
+        setSelectedPdfFile(null);
+        setShowPdfName(false);
         await fetch(`${API_URL}/agent/pdf/reset`, { method: 'POST' });
         return "Chat history cleared! Start fresh conversation.";
       } else if (command === 'chat' && pdfLoaded) {
@@ -276,8 +284,9 @@ const ChatBot = forwardRef((props, ref) => {
     try {
       setLoading(true);
       let aiResponse;
+      let hasEpicData = false;
       
-      // If PDF is selected, upload it to get AI analysis + generate epics
+      // If PDF is selected, upload it to get AI analysis + generate epics (FIRST TIME)
       if (selectedPdfFile) {
         console.log('Processing PDF:', selectedPdfFile.name);
         
@@ -302,45 +311,65 @@ const ChatBot = forwardRef((props, ref) => {
         aiResponse = analysisData.response;
         console.log('Step 1 Complete: Got AI response');
         
-        // ========== REQUEST 2: Save structured data to database (background) ==========
-        // Create a new FormData for the second request (first one is consumed)
-        const formData2 = new FormData();
-        formData2.append('file', selectedPdfFile);
+        // Mark PDF as loaded in backend for follow-up questions
+        setPdfLoaded(true);
         
-        const epicUrl = `${API_URL}/epics/generate-from-pdf?user_id=${currentUserId}`;
-        
-        console.log('Step 2: Calling epic generation endpoint in background...');
-        fetch(epicUrl, {
-          method: 'POST',
-          body: formData2
-        })
-        .then(res => {
-          console.log('Epic generation response status:', res.status);
-          return res.json();
-        })
-        .then(data => {
-          console.log('Epics saved to database:', data);
-        })
-        .catch(err => {
-          console.error('Error saving epics:', err);
-        });
-        
-        // Clear the selected file after sending
+        // Clear the selected file after sending (but keep pdfLoaded = true)
         setSelectedPdfFile(null);
-      } else {
+      } 
+      // If PDF is loaded (follow-up question about already analyzed PDF)
+      else if (pdfLoaded && userMessage.trim()) {
+        console.log('Sending follow-up question about loaded PDF');
+        
+        try {
+          const response = await fetch(`${API_URL}/agent/pdf/followup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userMessage })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to get PDF follow-up response');
+          }
+
+          const data = await response.json();
+          aiResponse = data.response;
+          console.log('Follow-up response received');
+
+          // Try to parse epic data from response (regardless of user message)
+          if (aiResponse) {
+            hasEpicData = processEpicGeneration(aiResponse);
+          }
+        } catch (err) {
+          console.error('Error in PDF follow-up:', err);
+          aiResponse = `Error: ${err.message}`;
+        }
+      }
+      else {
         // Regular chat without PDF
         aiResponse = await sendMessageToAPI(userMessage, command);
+        
+        // Try to parse epic data from response (regardless of user message)
+        if (aiResponse) {
+          hasEpicData = processEpicGeneration(aiResponse);
+        }
       }
       
       const updatedMessages = [
         ...newMessages,
-        { sender: "bot", text: aiResponse, type: selectedPdfFile ? "pdf_analysis" : command }
+        { 
+          sender: "bot", 
+          text: aiResponse, 
+          type: selectedPdfFile ? "pdf_analysis" : (hasEpicData ? "epic_generation" : command)
+        }
       ];
       setMessages(updatedMessages);
       
-      // Save to database
-      const chatTitle = selectedPdfFile ? `PDF: ${selectedPdfFile.name}` : userMessage.substring(0, 50);
-      saveChatToDb(updatedMessages, chatTitle);
+      // Only save to DB if not in approval mode (avoid double saves)
+      if (!approvalMode && !hasEpicData) {
+        const chatTitle = selectedPdfFile ? `PDF: ${selectedPdfFile.name}` : userMessage.substring(0, 50);
+        saveChatToDb(updatedMessages, chatTitle);
+      }
       
     } catch (error) {
       console.error('Error:', error);
@@ -361,6 +390,9 @@ const ChatBot = forwardRef((props, ref) => {
     setCurrentChatId(null);
     setPdfLoaded(false);
     setSelectedPdfFile(null);  // Clear selected PDF
+    setPendingEpic(null);
+    setPendingStories([]);
+    setApprovalMode(false);
   };
 
   const deleteChat = async (chatId) => {
@@ -374,8 +406,492 @@ const ChatBot = forwardRef((props, ref) => {
     }
   };
 
+  // ==================== EPIC GENERATION FUNCTIONS ====================
+
+  /**
+   * Parse AI response to extract epic and stories
+   * Expected format from AI:
+   * Epic: Title
+   * Description: ...
+   * Stories:
+   * - Story 1: Description
+   * - Story 2: Description
+   */
+  const parseEpicFromResponse = (response) => {
+    try {
+      // Check if response contains epic or user story patterns
+      const hasEpicKeyword = response.toLowerCase().includes('epic');
+      const hasAsAPattern = response.toLowerCase().includes('as a ');
+      const hasUserStoriesKeyword = response.toLowerCase().includes('user stor');
+      
+      if (!hasEpicKeyword && !hasAsAPattern && !hasUserStoriesKeyword) {
+        return null;
+      }
+
+      const lines = response.split('\n').map(line => line.trim()).filter(line => line);
+      let epic = {
+        title: '',
+        description: '',
+        stories: []
+      };
+
+      let currentSection = '';
+      let currentStory = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lowerLine = line.toLowerCase();
+
+        // Skip lines that are just "Acceptance" or "Acceptance Criteria:" - don't treat as stories
+        if (lowerLine === 'acceptance' || lowerLine === 'acceptance criteria:' || lowerLine === '* acceptance criteria:') {
+          continue;
+        }
+
+        // Detect Epic Title - Handle formats: **Epic:** Title, Epic: Title, etc.
+        if (lowerLine.includes('**epic') && !lowerLine.includes('description') && !lowerLine.includes('user')) {
+          // Extract everything after "Epic:" or "Epic**:"
+          const match = line.match(/\*?\*?[Ee]pic[:\s*]*\*?\*?\s*:?\s*(.+?)(?:\*\*)?$/);
+          if (match) {
+            epic.title = match[1].trim().replace(/\*\*/g, '');
+          }
+        } else if (lowerLine.startsWith('epic:') && !lowerLine.includes('description')) {
+          epic.title = line.substring(5).trim();
+        }
+        
+        // Detect Epic Description 
+        else if ((lowerLine.includes('description:') || lowerLine.startsWith('description')) && !lowerLine.includes('user story') && !lowerLine.includes('acceptance')) {
+          epic.description = line.split(':').slice(1).join(':').trim().replace(/\*\*/g, '');
+          currentSection = 'epic';
+        }
+        
+        // Detect Stories Section
+        else if (lowerLine.includes('user stor') || lowerLine.includes('**user stories') || lowerLine.includes('**child user stories')) {
+          currentSection = 'stories';
+        }
+        
+        // Detect Story Items - numbered (1., 2.) or bullet (-, *), or "As a" pattern
+        // BUT skip if line is just "Acceptance" or contains only "Acceptance"
+        else if (currentSection === 'stories' && (
+          lowerLine.match(/^\d+\.?\s+/) ||  // Numbered like "1. " or "1) "
+          lowerLine.match(/^[-*]\s+(?!acceptance)/i) ||     // Bullet points (but not "- Acceptance")
+          lowerLine.match(/^as\s+a\s+/) ||   // Direct "As a" pattern
+          lowerLine.match(/us-\d+/)          // Story ID like US-001
+        )) {
+          // Save previous story if exists
+          if (currentStory && currentStory.title) {
+            epic.stories.push({
+              title: currentStory.title,
+              description: currentStory.description || ''
+            });
+          }
+          
+          // Extract story title - Remove numbering/bullets and get the full story
+          let storyText = line
+            .replace(/^\d+\.?\s+/, '')        // Remove "1. " 
+            .replace(/^\d+\)\s+/, '')         // Remove "1) "
+            .replace(/^[-*]\s+/, '')          // Remove "- " or "* "
+            .trim();
+          
+          // If it has bold, clean it
+          storyText = storyText.replace(/\*\*(.+?)\*\*/g, '$1');
+          
+          // For "As a..." pattern, keep the entire sentence as the title
+          if (storyText.toLowerCase().startsWith('as a ')) {
+            // Extract up to the first line break or acceptance criteria
+            const titleMatch = storyText.match(/^(as\s+a\s+.+?)(?:\n|acceptance|criteria|$)/i);
+            if (titleMatch) {
+              currentStory = {
+                title: titleMatch[1].trim(),
+                description: ''
+              };
+            } else {
+              currentStory = {
+                title: storyText,
+                description: ''
+              };
+            }
+          } else {
+            // For other formats, try to extract title before acceptance criteria
+            const titleMatch = storyText.match(/^(.+?)(?:\s+acceptance|\s+criteria|\s+–|\s+-|$)/i);
+            currentStory = {
+              title: titleMatch ? titleMatch[1].trim() : storyText,
+              description: ''
+            };
+          }
+        }
+        
+        // Capture story description/acceptance criteria (only add to current story, don't create new entries)
+        else if (currentSection === 'stories' && currentStory && (lowerLine.includes('acceptance') || lowerLine.startsWith('+'))) {
+          let criteria = [];
+          let j = i;
+          // Collect acceptance criteria lines - these should NOT become separate stories
+          while (j < lines.length) {
+            const criteriaLine = lines[j];
+            const criteriaLineLower = criteriaLine.toLowerCase();
+            
+            // Stop if we hit a new story (numbered or "As a")
+            if (j > i && (criteriaLineLower.match(/^\d+\.?\s+/) || criteriaLineLower.match(/^as\s+a\s+/) || criteriaLineLower.match(/us-\d+/))) {
+              break;
+            }
+            
+            // Collect acceptance criteria text
+            if (criteriaLineLower.includes('acceptance') || criteriaLine.match(/^\s*[\+\-\*]\s+/)) {
+              let criterionText = criteriaLine
+                .replace(/^[\+\-\*]\s+/, '')  // Remove bullet
+                .replace(/^(acceptance|criteria):\s*/i, '')  // Remove "Acceptance Criteria:" label
+                .trim();
+              
+              // Skip if it's just the word "Acceptance"
+              if (criterionText && criterionText.toLowerCase() !== 'acceptance') {
+                criteria.push(criterionText);
+              }
+              j++;
+            } else if (criteriaLine.match(/^\s+[\+\-\*]\s+/)) {
+              // Indented bullet point
+              let criterionText = criteriaLine.trim().replace(/^[\+\-\*]\s+/, '');
+              if (criterionText && !criterionText.toLowerCase().match(/^(as |epic |story |user |acceptance)/)) {
+                criteria.push(criterionText);
+              }
+              j++;
+            } else if (criteria.length > 0) {
+              break;
+            } else {
+              j++;
+            }
+          }
+          
+          if (criteria.length > 0) {
+            currentStory.description = criteria.join('\n').replace(/\*\*/g, '');
+            i = j - 1;
+          }
+        }
+      }
+
+      // Add last story if exists
+      if (currentStory && currentStory.title) {
+        epic.stories.push({
+          title: currentStory.title,
+          description: currentStory.description || ''
+        });
+      }
+
+      // Return null if not enough data
+      if (!epic.title || epic.stories.length === 0) {
+        console.log('Parsing failed - Title:', epic.title, 'Stories:', epic.stories.length);
+        return null;
+      }
+
+      console.log('Successfully parsed epic:', epic);
+      return epic;
+    } catch (error) {
+      console.error('Error parsing epic from response:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Save epic with stories to database
+   */
+  const saveEpicWithStories = async () => {
+    if (!pendingEpic) {
+      console.error('No pending epic to save');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Ensure we have required data
+      if (!currentChatId || !currentUserId) {
+        throw new Error('Chat ID or User ID missing');
+      }
+
+      const payload = {
+        project_id: currentChatId,  // Use chat ID as project_id
+        user_id: currentUserId,
+        epic_id: 1,  // Epic counter (can be incremented for multiple epics)
+        epic_title: pendingEpic.title,  // Epic name
+        epic_description: pendingEpic.description,  // Store ONLY epic description (NOT story descriptions)
+        stories: pendingEpic.stories.map((story, idx) => ({
+          story_id: idx + 1,  // Story counter starting from 1
+          story_title: story.title  // Story name only - NO descriptions
+        }))
+      };
+
+      console.log('Saving epic with payload:', payload);
+
+      const response = await fetch(`${API_URL}/project-items/batch-save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save epic');
+      }
+
+      const result = await response.json();
+      console.log('Epic saved successfully:', result);
+
+      // Add success message to chat
+      const successMessage = `✅ Epic "${pendingEpic.title}" with ${pendingEpic.stories.length} stories saved successfully!`;
+      const updatedMessages = [
+        ...messages,
+        { sender: "bot", text: successMessage, type: "epic_saved" }
+      ];
+      setMessages(updatedMessages);
+      saveChatToDb(updatedMessages);
+
+      // Clear pending epic
+      setPendingEpic(null);
+      setPendingStories([]);
+      setApprovalMode(false);
+
+    } catch (error) {
+      console.error('Error saving epic:', error);
+      const errorMessage = `❌ Error saving epic: ${error.message}`;
+      const updatedMessages = [
+        ...messages,
+        { sender: "bot", text: errorMessage, type: "error" }
+      ];
+      setMessages(updatedMessages);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle user approval for epic
+   */
+  const handleApproveEpic = () => {
+    saveEpicWithStories();
+  };
+
+  /**
+   * Handle rejecting epic (cancel approval)
+   */
+  const handleRejectEpic = () => {
+    setPendingEpic(null);
+    setPendingStories([]);
+    setApprovalMode(false);
+    const cancelMessage = "Epic generation cancelled. You can ask me to generate a new epic.";
+    const updatedMessages = [
+      ...messages,
+      { sender: "bot", text: cancelMessage, type: "chat" }
+    ];
+    setMessages(updatedMessages);
+    saveChatToDb(updatedMessages);
+  };
+
+  /**
+   * Check if response contains epic generation request and process it
+   */
+  const processEpicGeneration = (response) => {
+    console.log('Processing epic generation...');
+    const parsedEpic = parseEpicFromResponse(response);
+    
+    if (parsedEpic) {
+      console.log('Epic parsed successfully, showing approval modal:', parsedEpic);
+      setPendingEpic(parsedEpic);
+      setPendingStories(parsedEpic.stories);
+      setApprovalMode(true);
+      return true;
+    }
+    console.log('Failed to parse epic from response');
+    return false;
+  };
+
+  // ==================== END EPIC FUNCTIONS ====================
+
   return (
     <div className="chatbot-main" style={{ width: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* Epic Approval Modal */}
+        {approvalMode && pendingEpic && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(102, 126, 234, 0.2)',
+              animation: 'slideUp 0.3s ease'
+            }}>
+              <h2 style={{
+                color: '#fff',
+                marginBottom: '16px',
+                fontSize: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span>📊</span> Review Generated Epic
+              </h2>
+
+              <p style={{
+                color: '#aaa',
+                marginBottom: '24px',
+                fontSize: '0.95rem'
+              }}>
+                Please review the epic and stories below. Click "Approve" to save them to the database.
+              </p>
+
+              {/* Epic Details */}
+              <div style={{
+                background: 'rgba(102, 126, 234, 0.1)',
+                border: '1px solid rgba(102, 126, 234, 0.3)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <h3 style={{
+                  color: '#667eea',
+                  marginBottom: '8px',
+                  fontSize: '1.1rem'
+                }}>
+                  Epic: {pendingEpic.title}
+                </h3>
+                <p style={{
+                  color: '#ddd',
+                  fontSize: '0.95rem',
+                  margin: 0
+                }}>
+                  {pendingEpic.description}
+                </p>
+              </div>
+
+              {/* Stories List */}
+              <div style={{
+                marginBottom: '24px'
+              }}>
+                <h4 style={{
+                  color: '#fff',
+                  marginBottom: '12px',
+                  fontSize: '1rem',
+                  fontWeight: 600
+                }}>
+                  Stories ({pendingEpic.stories.length}):
+                </h4>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  {pendingEpic.stories.map((story, idx) => (
+                    <div key={idx} style={{
+                      background: 'rgba(56, 239, 125, 0.1)',
+                      border: '1px solid rgba(56, 239, 125, 0.3)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      borderLeft: '4px solid #38ef7d'
+                    }}>
+                      <h5 style={{
+                        color: '#38ef7d',
+                        margin: '0 0 6px 0',
+                        fontSize: '0.95rem',
+                        fontWeight: 600
+                      }}>
+                        {idx + 1}. {story.title}
+                      </h5>
+                      <p style={{
+                        color: '#aaa',
+                        margin: 0,
+                        fontSize: '0.9rem'
+                      }}>
+                        {story.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={handleRejectEpic}
+                  disabled={loading}
+                  style={{
+                    background: 'rgba(255, 85, 85, 0.2)',
+                    border: '1px solid rgba(255, 85, 85, 0.5)',
+                    color: '#ff5555',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s ease',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.3)';
+                      e.target.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.2)';
+                      e.target.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApproveEpic}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s ease',
+                    opacity: loading ? 0.6 : 1,
+                    boxShadow: '0 4px 12px rgba(56, 239, 125, 0.25)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 6px 16px rgba(56, 239, 125, 0.35)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(56, 239, 125, 0.25)';
+                    }
+                  }}
+                >
+                  {loading ? 'Saving...' : 'Approve & Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="chatbot-messages" style={{ flex: 1, overflowY: 'auto', paddingBottom: '140px' }}>
           {messages.map((msg, idx) => (
             msg.sender === 'user' ? (
@@ -444,6 +960,64 @@ const ChatBot = forwardRef((props, ref) => {
                 style={{ display: 'none' }}
                 onChange={handlePDFUpload}
               />
+              
+              {/* PDF Loaded Indicator */}
+              {pdfLoaded && !selectedPdfFile && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '70px',
+                  left: '20px',
+                  right: '20px',
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
+                  border: '1px solid rgba(102, 126, 234, 0.4)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backdropFilter: 'blur(10px)',
+                  zIndex: 10
+                }}>
+                  <span style={{
+                    color: '#667eea',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    📄 PDF Loaded - Ask follow-up questions
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPdfLoaded(false);
+                      setSelectedPdfFile(null);
+                      fetch(`${API_URL}/agent/pdf/reset`, { method: 'POST' });
+                    }}
+                    style={{
+                      background: 'rgba(255, 85, 85, 0.3)',
+                      border: 'none',
+                      color: '#ff5555',
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.3)';
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+              
               {selectedPdfFile && (
                 <div style={{ position: 'relative', marginBottom: '8px' }}>
                   {/* Circle Button */}
