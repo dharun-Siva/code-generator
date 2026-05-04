@@ -1,6 +1,7 @@
 import React from 'react';
 import ChatBot from './ChatBot';
 import Sidebar from './Sidebar';
+import CodegenItems from './codegen/CodegenItems';
 import { useRef, useState, useEffect } from 'react';
 import './UserDashboard.css';
 
@@ -9,6 +10,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [selectedAppId, setSelectedAppId] = useState(null);
+  const [selectedWorkflowType, setSelectedWorkflowType] = useState(null);
   const [showAppNameInput, setShowAppNameInput] = useState(false);
   const [showApplicationsDashboard, setShowApplicationsDashboard] = useState(true);
   const [showAppDashboard, setShowAppDashboard] = useState(false);
@@ -50,6 +52,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     setShowDashboardDialog(false);
     setShowAppDashboard(false);
     setSelectedAppId(null);
+    setSelectedWorkflowType(null);
   };
 
   // Handler to show dashboard
@@ -97,6 +100,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   // Handler to open chat for a specific workflow
   const handleOpenWorkflow = (chatId, workflowType) => {
     setCurrentChatId(chatId);
+    setSelectedWorkflowType(workflowType);
     setShowAppDashboard(false);
   };
 
@@ -465,14 +469,27 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
             <button type="button" className="app-form-btn-secondary" onClick={() => { setShowOpenList(false); setShowApplicationsDashboard(true); setSearchTerm(""); }}>Cancel</button>
           </div>
         ) : currentChatId ? (
-          <div style={{ width: '100%' }}>
-            <ChatBot 
-              ref={chatBotRef} 
-              user={user}
-              currentChatId={currentChatId}
-              onChatSaved={handleChatSaved}
+          selectedWorkflowType === 'codegen' ? (
+            <CodegenItems 
+              projectId={selectedAppId}
+              userId={user?.id}
+              appName={chats.find(c => c.id === selectedAppId)?.title || 'Application'}
+              onBack={() => {
+                setCurrentChatId(null);
+                setSelectedWorkflowType(null);
+                setShowAppDashboard(true);
+              }}
             />
-          </div>
+          ) : (
+            <div style={{ width: '100%' }}>
+              <ChatBot 
+                ref={chatBotRef} 
+                user={user}
+                currentChatId={currentChatId}
+                onChatSaved={handleChatSaved}
+              />
+            </div>
+          )
         ) : (
           <div className="apps-dashboard-container">
             <div className="apps-dashboard-header">

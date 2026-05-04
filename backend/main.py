@@ -367,3 +367,60 @@ def delete_project_items_by_epic_endpoint(project_id: int, epic_id: int, db: Ses
         return {"status": "Epic and stories deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== CODE GENERATION ENDPOINTS ====================
+
+class CodeGenRequest(BaseModel):
+    project_id: int
+    user_id: int
+    app_name: str
+    github_token: str
+
+
+@app.post("/codegen/generate")
+def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
+    """Generate complete project code and push to GitHub"""
+    try:
+        from codegen.code_generator import CodeGenerator
+        
+        # Get all project items for the project
+        all_items = crud.get_all_project_items(db, request.project_id)
+        
+        # Group by epic_id for the code generator
+        grouped = {}
+        for item in all_items:
+            if item.epic_id not in grouped:
+                grouped[item.epic_id] = {"epic": None, "stories": []}
+            
+            if item.story_id == 0:
+                grouped[item.epic_id]["epic"] = item
+            else:
+                grouped[item.epic_id]["stories"].append({
+                    "story_title": item.story_title,
+                    "story_id": item.story_id
+                })
+        
+        epics_data = {
+            "project_id": request.project_id,
+            "epics": grouped
+        }
+        
+        # Generate code
+        code_generator = CodeGenerator()
+        result = code_generator.generate_complete_project(
+            app_name=request.app_name,
+            epics_and_stories=epics_data,
+            github_token=request.github_token
+        )
+        
+        return {
+            "status": "success",
+            "message": result["message"],
+            "repo_url": result["repo_url"]
+        }
+    except Exception as e:
+        print(f"ERROR in generate_code: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

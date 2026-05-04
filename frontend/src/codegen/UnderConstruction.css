@@ -1,0 +1,124 @@
+.under-construction-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100vh - 200px);
+  background: linear-gradient(135deg, #f5f7ff 0%, #e8ecff 100%);
+  padding: 2rem;
+}
+
+.under-construction-content {
+  background: white;
+  border-radius: 16px;
+  padding: 4rem 3rem;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(63, 81, 181, 0.15);
+  text-align: center;
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.construction-icon {
+  font-size: 80px;
+  margin-bottom: 2rem;
+  display: inline-block;
+  animation: rotate 3s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.construction-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
+}
+
+.construction-subtitle {
+  font-size: 18px;
+  color: #666;
+  margin: 0 0 1.5rem 0;
+  font-weight: 500;
+}
+
+.construction-message {
+  font-size: 15px;
+  color: #777;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.construction-features {
+  background: linear-gradient(135deg, #f9f9ff 0%, #f5f7ff 100%);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  text-align: left;
+  border-left: 4px solid #3f51b5;
+}
+
+.construction-features h3 {
+  font-size: 16px;
+  color: #3f51b5;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.construction-features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.construction-features li {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.construction-features li:last-child {
+  margin-bottom: 0;
+}
+
+.construction-back-btn {
+  background: linear-gradient(135deg, #3f51b5 0%, #303f9f 100%);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(63, 81, 181, 0.3);
+}
+
+.construction-back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(63, 81, 181, 0.4);
+}
+
+.construction-back-btn:active {
+  transform: translateY(0);
+}

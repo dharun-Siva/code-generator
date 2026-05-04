@@ -248,6 +248,61 @@ class AIAgent:
         """Clear the stored PDF content"""
         self.current_pdf_content = None
     
+    def generate_code(self, prompt: str, language: str = "python", max_tokens: int = 2048) -> str:
+        """Generate complete, production-ready code for a given requirement
+        
+        Args:
+            prompt: Detailed requirements for code generation
+            language: Programming language (python, javascript, sql, etc.)
+            max_tokens: Maximum tokens for response (default 2048)
+        
+        Returns:
+            Complete code implementation
+        """
+        try:
+            system_prompt = f"""You are an expert {language} programmer specializing in writing production-ready code.
+            
+IMPORTANT RULES:
+1. Generate COMPLETE, WORKING CODE with NO placeholders, TODOs, or incomplete implementations
+2. Include proper error handling, validation, and edge cases
+3. Use best practices and design patterns
+4. Add comprehensive comments and docstrings
+5. Make code fully functional and ready to use
+6. Do NOT ask questions or request clarification
+7. Return ONLY the code, no explanations or markdown formatting
+
+Generate code that:
+- Handles edge cases properly
+- Includes error handling
+- Is well-commented
+- Follows {language} best practices
+- Is production-ready and complete"""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.5,  # Lower temperature for more deterministic code
+                max_tokens=max_tokens,
+            )
+            
+            code = response.choices[0].message.content
+            
+            # Clean up markdown code blocks if present
+            if code.startswith("```"):
+                lines = code.split("\n")
+                code = "\n".join(lines[1:-1]) if len(lines) > 2 else code
+            
+            return code.strip()
+        except Exception as e:
+            print(f"ERROR in generate_code: {str(e)}")
+            traceback.print_exc()
+            raise
+    
     def extract_pages_from_pdf(self, pdf_content: bytes) -> list:
         """Extract text from each page of PDF individually"""
         try:
