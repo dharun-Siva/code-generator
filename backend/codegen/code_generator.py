@@ -476,7 +476,11 @@ export default {page_name};
                 "react": "^18.2.0",
                 "react-dom": "^18.2.0",
                 "axios": "^1.4.0",
-                "react-router-dom": "^6.0.0"
+                "react-router-dom": "^6.0.0",
+                "react-bootstrap": "^2.8.0",
+                "bootstrap": "^5.3.0",
+                "react-hook-form": "^7.48.0",
+                "react-toastify": "^9.1.3"
             },
             "scripts": {
                 "start": "react-scripts start",
@@ -487,6 +491,28 @@ export default {page_name};
         
         with open(os.path.join(frontend_dir, "package.json"), "w", encoding='utf-8') as f:
             json.dump(package_json, f, indent=2)
+        
+        # Generate public folder with index.html
+        public_dir = os.path.join(frontend_dir, "public")
+        os.makedirs(public_dir)
+        
+        index_html = """<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Web site created using create-react-app" />
+    <title>React App</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+"""
+        with open(os.path.join(public_dir, "index.html"), "w", encoding='utf-8') as f:
+            f.write(index_html)
         
         # Generate folder structure
         src_dir = os.path.join(frontend_dir, "src")
@@ -623,6 +649,106 @@ code {
         with open(os.path.join(src_dir, "index.css"), "w", encoding='utf-8') as f:
             f.write(index_css)
         
+        # Generate App.css
+        app_css = """.app {
+  text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.app h1 {
+  margin: 0;
+  font-size: 2em;
+}
+
+.container {
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.component-container {
+  padding: 20px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.form input,
+.form textarea {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.form button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+}
+
+.form button:hover {
+  background-color: #0056b3;
+}
+
+.loading-box,
+.error-box {
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+.loading-box {
+  background-color: #e7f3ff;
+  color: #004085;
+}
+
+.error-box {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.result {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #d4edda;
+  border-radius: 4px;
+  color: #155724;
+}
+
+pre {
+  background-color: #f4f4f4;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+"""
+        with open(os.path.join(src_dir, "App.css"), "w", encoding='utf-8') as f:
+            f.write(app_css)
+        
         # Generate .gitignore
         gitignore = """node_modules/
 .env
@@ -631,6 +757,10 @@ build/
 dist/
 .DS_Store
 npm-debug.log
+.vscode/
+*.swp
+*.swo
+*~
 """
         with open(os.path.join(frontend_dir, ".gitignore"), "w", encoding='utf-8') as f:
             f.write(gitignore)
@@ -658,6 +788,11 @@ python-dotenv==1.0.0
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import uvicorn
+from database import engine, SessionLocal, get_db
+from models import Base
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="{app_name}",
@@ -687,16 +822,6 @@ def health_check():
 # ============ AUTO-GENERATED ENDPOINTS ============
 
 {endpoints_code}
-
-# ============ DATABASE ============
-# TODO: Configure database connection
-# from database import SessionLocal
-# def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -784,9 +909,28 @@ venv/
 dist/
 build/
 *.egg-info/
+.vscode/
+*.swp
+*.swo
+*~
 """
         with open(os.path.join(backend_dir, ".gitignore"), "w", encoding='utf-8') as f:
             f.write(gitignore)
+        
+        # Generate .env.example
+        env_example = """# Database Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/app_db
+
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_DEBUG=False
+
+# Frontend Configuration
+REACT_APP_API_URL=http://localhost:8000
+"""
+        with open(os.path.join(backend_dir, ".env.example"), "w", encoding='utf-8') as f:
+            f.write(env_example)
     
     def _generate_endpoints_from_stories(self, epics_and_stories: Dict) -> str:
         """Generate FastAPI endpoints with AI-powered implementation"""
@@ -821,14 +965,18 @@ REQUIREMENTS:
 4. PUT /{entity_name}/{{id}} - Update
 5. DELETE /{entity_name}/{{id}} - Delete
 6. Include proper HTTP status codes (200, 201, 404, 400, 500)
-7. Define Pydantic models for request/response
+7. Define Pydantic models for request/response INSIDE the functions
 8. Include comprehensive error handling
 9. Add detailed docstrings
 10. COMPLETE WORKING CODE - NO TODOs or placeholders
-11. Use in-memory storage or mock data
+11. Use database with Depends(get_db) for session management
 12. Include input validation
+13. DO NOT create a new FastAPI app instance
+14. DO NOT include any import statements
+15. ONLY return @app.get/@app.post/@app.put/@app.delete decorator functions
+16. Use the 'app' variable that already exists in main.py
 
-Return ONLY the FastAPI endpoint code with no imports section."""
+Return ONLY the endpoint functions with decorators, no imports or app creation."""
                             
                             endpoint_code = self.agent.generate_code(prompt, language="python", max_tokens=2048)
                             endpoints.append(endpoint_code)
@@ -916,12 +1064,13 @@ def create_item(name: str, description: str = ""):
         # Generate init.sql with actual tables based on stories
         tables_sql = self._generate_tables_from_stories(epics_and_stories)
         
+        db_name = app_name.lower().replace(' ', '_').replace('-', '_')
         init_sql = f"""-- PostgreSQL DDL for {app_name}
 -- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 -- This file sets up the database schema
 
--- Create database
-CREATE DATABASE IF NOT EXISTS {app_name.lower().replace(' ', '_').replace('-', '_')};
+-- Create database (uncomment and run manually if database doesn't exist)
+-- CREATE DATABASE {db_name};
 
 -- Create schema
 CREATE SCHEMA IF NOT EXISTS public;
@@ -1048,10 +1197,24 @@ CREATE TABLE IF NOT EXISTS {entity_name} (
     description TEXT,
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
     updated_by VARCHAR(100)
 );
+
+-- Create trigger for auto-updating updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER {entity_name}_updated_at_trigger
+BEFORE UPDATE ON {entity_name}
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 
 CREATE INDEX IF NOT EXISTS idx_{entity_name}_status ON {entity_name}(status);
 CREATE INDEX IF NOT EXISTS idx_{entity_name}_created_at ON {entity_name}(created_at);
@@ -1070,7 +1233,22 @@ CREATE TABLE IF NOT EXISTS items (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create trigger for auto-updating updated_at timestamp
+CREATE OR REPLACE FUNCTION update_items_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER items_updated_at_trigger
+BEFORE UPDATE ON items
+FOR EACH ROW
+EXECUTE FUNCTION update_items_updated_at();
+
 CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
+CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at);
 """
 
     def _generate_readme(self, project_dir: str, app_name: str):

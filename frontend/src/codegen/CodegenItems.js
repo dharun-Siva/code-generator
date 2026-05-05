@@ -149,6 +149,15 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
         </div>
       </div>
 
+      <div className="codegen-action-bar">
+        <button 
+          className="generate-code-btn" 
+          onClick={handleCodeGeneration}
+        >
+          🚀 Generate Code
+        </button>
+      </div>
+
       {items.length === 0 ? (
         <div className="codegen-empty-state">
           <div className="empty-icon">📋</div>
@@ -168,23 +177,6 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
                 <h3 className="item-title">{item.title}</h3>
                 {item.type === 'story' && (
                   <p className="item-epic-reference">Part of: <strong>{item.epicTitle}</strong></p>
-                )}
-              </div>
-              <div className="item-actions">
-                <button className="action-btn view-btn" title="View details">
-                  👁️
-                </button>
-                <button className="action-btn edit-btn" title="Edit">
-                  ✏️
-                </button>
-                {item.type === 'story' && (
-                  <button 
-                    className="action-btn code-btn" 
-                    title="Generate code for all stories"
-                    onClick={handleCodeGeneration}
-                  >
-                    💻
-                  </button>
                 )}
               </div>
             </div>
