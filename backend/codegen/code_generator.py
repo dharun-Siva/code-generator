@@ -278,14 +278,16 @@ REQUIREMENTS:
 4. Search and filter functionality
 5. API integration using apiClient from '../services/api'
 6. Complete error handling and loading states
-7. Proper styling with inline styles or CSS classes
+7. MUST USE INLINE STYLES ONLY - NO CSS FILE IMPORTS
 8. COMPLETE WORKING CODE - NO TODOs or placeholders
 9. JSDoc comments for all functions
 10. Data fetching on mount
 11. Edit/delete functionality
 12. Responsive design
+13. DO NOT import any CSS or style files
+14. Use Bootstrap classes or inline styles for all styling
 
-Return ONLY the JSX page component code starting with 'import React'."""
+Return ONLY the JSX page component code starting with 'import React'. NEVER import CSS files."""
             
             code = self.agent.generate_code(prompt, language="javascript", max_tokens=2048)
             
@@ -303,9 +305,8 @@ Return ONLY the JSX page component code starting with 'import React'."""
         """Fallback template for entity page"""
         stories_list = ", ".join([f'"{s.get("story_title", "Story")}"' for s in stories[:5]])
         
-        return f'''import React, {{ useState, useEffect }} from 'react';
+        return f"""import React, {{ useState, useEffect }} from 'react';
 import apiClient from '../services/api';
-import './PageStyle.css';
 
 /**
  * {page_name} Page
@@ -318,6 +319,108 @@ function {page_name}() {{
   const [formData, setFormData] = useState({{ name: '', description: '' }});
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const containerStyle = {{
+    padding: '20px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    fontFamily: 'Arial, sans-serif'
+  }};
+
+  const formStyle = {{
+    backgroundColor: '#f9f9f9',
+    padding: '15px',
+    borderRadius: '5px',
+    marginBottom: '20px',
+    border: '1px solid #ddd'
+  }};
+
+  const formGroupStyle = {{
+    marginBottom: '15px'
+  }};
+
+  const labelStyle = {{
+    display: 'block',
+    marginBottom: '5px',
+    fontWeight: 'bold',
+    color: '#333'
+  }};
+
+  const inputStyle = {{
+    width: '100%',
+    padding: '8px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    boxSizing: 'border-box'
+  }};
+
+  const buttonStyle = {{
+    backgroundColor: '#007bff',
+    color: 'white',
+    padding: '10px 15px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    marginRight: '10px',
+    fontSize: '14px'
+  }};
+
+  const buttonDeleteStyle = {{
+    ...buttonStyle,
+    backgroundColor: '#dc3545'
+  }};
+
+  const buttonCancelStyle = {{
+    ...buttonStyle,
+    backgroundColor: '#6c757d'
+  }};
+
+  const errorStyle = {{
+    backgroundColor: '#f8d7da',
+    color: '#721c24',
+    padding: '12px',
+    borderRadius: '4px',
+    marginBottom: '15px',
+    border: '1px solid #f5c6cb'
+  }};
+
+  const loadingStyle = {{
+    textAlign: 'center',
+    padding: '20px',
+    fontSize: '18px',
+    color: '#666'
+  }};
+
+  const tableStyle = {{
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginTop: '10px',
+    border: '1px solid #ddd'
+  }};
+
+  const thStyle = {{
+    backgroundColor: '#f8f9fa',
+    padding: '12px',
+    textAlign: 'left',
+    borderBottom: '2px solid #dee2e6',
+    fontWeight: 'bold'
+  }};
+
+  const tdStyle = {{
+    padding: '12px',
+    borderBottom: '1px solid #dee2e6'
+  }};
+
+  const searchStyle = {{
+    width: '100%',
+    padding: '10px',
+    marginBottom: '15px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    boxSizing: 'border-box'
+  }};
 
   useEffect(() => {{
     fetchItems();
@@ -374,17 +477,18 @@ function {page_name}() {{
   );
 
   return (
-    <div className="page-container">
-      <h1>{{entity_name.toUpperCase()}}</h1>
-      <p className="subtitle">Manage {{entity_name}} - Available operations: {{stories_list}}</p>
+    <div style={{containerStyle}}>
+      <h1>{entity_name.toUpperCase()}</h1>
+      <p style={{color: '#666'}}>Manage {entity_name} - Available operations: {stories_list}</p>
       
-      {{error && <div className="error-message">Error: {{error}}</div>}}
-      {{loading && <div className="loading-spinner">Loading...</div>}}
+      {{error && <div style={{errorStyle}}>Error: {{error}}</div>}}
+      {{loading && <div style={{loadingStyle}}>Loading...</div>}}
 
-      <form onSubmit={{handleSubmit}} className="form-container">
-        <div className="form-group">
-          <label htmlFor="name">Name:</label>
+      <form onSubmit={{handleSubmit}} style={{formStyle}}>
+        <div style={{formGroupStyle}}>
+          <label style={{labelStyle}} htmlFor="name">Name:</label>
           <input
+            style={{inputStyle}}
             id="name"
             type="text"
             value={{formData.name}}
@@ -393,61 +497,73 @@ function {page_name}() {{
             placeholder="Enter name"
           />
         </div>
-        <div className="form-group">
-          <label htmlFor="description">Description:</label>
+        <div style={{formGroupStyle}}>
+          <label style={{labelStyle}} htmlFor="description">Description:</label>
           <textarea
+            style={{inputStyle}}
             id="description"
             value={{formData.description}}
             onChange={{(e) => setFormData({{ ...formData, description: e.target.value }})}}
             placeholder="Enter description"
           />
         </div>
-        <button type="submit" disabled={{loading}}>
-          {{editingId ? 'Update' : 'Create'}} {{entity_name.slice(0, -1)}}
+        <button type="submit" style={{buttonStyle}} disabled={{loading}}>
+          {{editingId ? 'Update' : 'Create'}} {entity_name.lower()}
         </button>
         {{editingId && (
-          <button type="button" onClick={{() => {{
-            setEditingId(null);
-            setFormData({{ name: '', description: '' }});
-          }}}}>
+          <button 
+            type="button" 
+            style={{buttonCancelStyle}}
+            onClick={{() => {{
+              setEditingId(null);
+              setFormData({{ name: '', description: '' }});
+            }}}}>
             Cancel
           </button>
         )}}
       </form>
 
-      <div className="search-container">
-        <input
-          type="text"
-          placeholder="Search {{entity_name}}..."
-          value={{searchTerm}}
-          onChange={{(e) => setSearchTerm(e.target.value)}}
-          className="search-input"
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="Search {entity_name}..."
+        value={{searchTerm}}
+        onChange={{(e) => setSearchTerm(e.target.value)}}
+        style={{searchStyle}}
+      />
 
-      <div className="items-list">
-        <h2>Existing {{entity_name}}</h2>
+      <div>
+        <h2>Existing {entity_name}</h2>
         {{filteredItems.length === 0 ? (
           <p>No items found</p>
         ) : (
-          <table className="items-table">
+          <table style={{tableStyle}}>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Actions</th>
+                <th style={{thStyle}}>ID</th>
+                <th style={{thStyle}}>Name</th>
+                <th style={{thStyle}}>Description</th>
+                <th style={{thStyle}}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {{filteredItems.map((item) => (
                 <tr key={{item.id}}>
-                  <td>{{item.id}}</td>
-                  <td>{{item.name}}</td>
-                  <td>{{item.description}}</td>
-                  <td>
-                    <button onClick={{() => handleEdit(item)}} className="btn-edit">Edit</button>
-                    <button onClick={{() => handleDelete(item.id)}} className="btn-delete">Delete</button>
+                  <td style={{tdStyle}}>{{item.id}}</td>
+                  <td style={{tdStyle}}>{{item.name}}</td>
+                  <td style={{tdStyle}}>{{item.description}}</td>
+                  <td style={{tdStyle}}>
+                    <button 
+                      onClick={{() => handleEdit(item)}} 
+                      style={{buttonStyle}}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={{() => handleDelete(item.id)}} 
+                      style={{buttonDeleteStyle}}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}}
@@ -460,7 +576,7 @@ function {page_name}() {{
 }}
 
 export default {page_name};
-'''
+"""
 
     def _generate_frontend(self, project_dir: str, app_name: str, epics_and_stories: Dict):
         """Generate React frontend code based on domain entities"""
@@ -480,12 +596,38 @@ export default {page_name};
                 "react-bootstrap": "^2.8.0",
                 "bootstrap": "^5.3.0",
                 "react-hook-form": "^7.48.0",
-                "react-toastify": "^9.1.3"
+                "react-toastify": "^9.1.3",
+                "@fortawesome/react-fontawesome": "^0.2.0",
+                "@fortawesome/fontawesome-svg-core": "^6.4.0",
+                "@fortawesome/free-solid-svg-icons": "^6.4.0",
+                "@fortawesome/free-regular-svg-icons": "^6.4.0",
+                "antd": "^5.11.0",
+                "react-icons": "^4.12.0"
+            },
+            "devDependencies": {
+                "react-scripts": "5.0.1"
             },
             "scripts": {
                 "start": "react-scripts start",
                 "build": "react-scripts build",
                 "test": "react-scripts test"
+            },
+            "eslintConfig": {
+                "extends": [
+                    "react-app"
+                ]
+            },
+            "browserslist": {
+                "production": [
+                    ">0.2%",
+                    "not dead",
+                    "not op_mini all"
+                ],
+                "development": [
+                    "last 1 chrome version",
+                    "last 1 firefox version",
+                    "last 1 safari version"
+                ]
             }
         }
         
@@ -586,7 +728,7 @@ export default apiClient;
                             f.write(component_code)
         
         # Generate App.js with routes
-        routes_str = "\n".join(routes_list) if routes_list else "        <Route path=\"/\" element={<Home />} />"
+        routes_str = "\n".join(routes_list) if routes_list else "        <Route path=\"/\" element={<div><h1>Welcome to {app_name}</h1></div>} />"
         imports_str = "\n".join(imports_list) if imports_list else "// Import pages here"
         
         app_js = f"""import React from 'react';

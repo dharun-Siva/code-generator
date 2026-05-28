@@ -1,6 +1,7 @@
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import models
@@ -9,6 +10,20 @@ import crud
 from database import SessionLocal, engine
 from agent import AIAgent
 from fastapi import UploadFile, File
+import requests
+import os
+from urllib.parse import urlencode
+from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# GitHub OAuth Configuration
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "your_client_id_here")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "your_client_secret_here")
+GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/github/callback")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -375,7 +390,7 @@ class CodeGenRequest(BaseModel):
     project_id: int
     user_id: int
     app_name: str
-    github_token: str
+    github_token: Optional[str] = None  # Optional - will use stored token if not provided
 
 
 @app.post("/codegen/generate")
@@ -383,6 +398,14 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
     """Generate complete project code and push to GitHub"""
     try:
         from codegen.code_generator import CodeGenerator
+        
+        # Use provided token or fetch from database
+        github_token = request.github_token
+        if not github_token:
+            user = crud.get_user(db, request.user_id)
+            if not user or not user.github_oauth_token:
+                raise HTTPException(status_code=400, detail="GitHub not connected. Please connect your GitHub account first.")
+            github_token = user.github_oauth_token
         
         # Get all project items for the project
         all_items = crud.get_all_project_items(db, request.project_id)
@@ -411,7 +434,7 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
         result = code_generator.generate_complete_project(
             app_name=request.app_name,
             epics_and_stories=epics_data,
-            github_token=request.github_token
+            github_token=github_token
         )
         
         return {
@@ -423,4 +446,117 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
         print(f"ERROR in generate_code: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== GITHUB OAUTH ENDPOINTS ====================
+
+@app.get("/github/login")
+def github_login(user_id: int):
+    """Initiate GitHub OAuth flow"""
+    try:
+        # Store user_id in state for callback
+        state = f"{user_id}:{os.urandom(8).hex()}"
+        
+        params = {
+            "client_id": GITHUB_CLIENT_ID,
+            "redirect_uri": GITHUB_REDIRECT_URI,
+            "scope": "repo user",
+            "state": state,
+            "allow_signup": "true"
+        }
+        
+        github_auth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
+        return {"auth_url": github_auth_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/callback")
+async def github_callback(code: str, state: str, db: Session = Depends(get_db)):
+    """Handle GitHub OAuth callback"""
+    try:
+        if not code or not state:
+            raise HTTPException(status_code=400, detail="Missing code or state parameter")
+        
+        # Extract user_id from state
+        user_id = int(state.split(":")[0])
+        
+        # Exchange code for access token
+        token_response = requests.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": GITHUB_REDIRECT_URI,
+            },
+            headers={"Accept": "application/json"}
+        )
+        
+        if token_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to get access token")
+        
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(status_code=400, detail="No access token received")
+        
+        # Get GitHub user info
+        user_response = requests.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"token {access_token}"}
+        )
+        
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to get GitHub user info")
+        
+        github_user = user_response.json()
+        github_username = github_user.get("login")
+        
+        # Store token and username in database
+        crud.update_user_github_token(db, user_id, access_token, github_username)
+        
+        # Redirect to frontend with success message
+        return RedirectResponse(url=f"{FRONTEND_URL}/user?github_connected=true")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+    except Exception as e:
+        print(f"ERROR in github_callback: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/status/{user_id}")
+def get_github_status(user_id: int, db: Session = Depends(get_db)):
+    """Check if user has GitHub connected"""
+    try:
+        user = crud.get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "connected": bool(user.github_oauth_token),
+            "github_username": user.github_username or None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/github/disconnect/{user_id}")
+def disconnect_github(user_id: int, db: Session = Depends(get_db)):
+    """Disconnect GitHub from user account"""
+    try:
+        user = crud.get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        crud.update_user_github_token(db, user_id, None, None)
+        
+        return {"status": "GitHub disconnected successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

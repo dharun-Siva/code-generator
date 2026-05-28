@@ -9,6 +9,8 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    github_oauth_token = Column(String, nullable=True)  # GitHub OAuth access token
+    github_username = Column(String, nullable=True)  # GitHub username
     
     # Relationship to chats
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan")

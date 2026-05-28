@@ -3,6 +3,8 @@ import { Routes, Route, useNavigate, Link, Navigate } from 'react-router-dom';
 import AdminDashboard from './AdminDashboard';
 import UserDashboard from './UserDashboard';
 import Sidebar from './Sidebar';
+import GitHubConnect from './GitHubConnect';
+import OAuthCallback from './OAuthCallback';
 import React, { useState, useRef, useEffect } from 'react';
 import AuthPage from './AuthPage';
 import './App.css';
@@ -172,10 +174,12 @@ function App() {
         <>
           {/* Header with profile dropdown */}
           <header style={{ height: '100px', background: 'linear-gradient(135deg, #4666a3 0%, #375087 100%)', boxShadow: '0 4px 16px rgba(70, 102, 163, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
-            <span style={{ fontWeight: '900', fontSize: '2.5rem', letterSpacing: '3px', color: '#fff', textTransform: 'uppercase', width: '100%', textAlign: 'center' }}>
+            <span style={{ fontWeight: '900', fontSize: '2.5rem', letterSpacing: '3px', color: '#fff', textTransform: 'uppercase', flex: 1, textAlign: 'center' }}>
               CODE GENERATOR
             </span>
-            <div style={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1100, cursor: 'pointer' }}>
+            <div style={{ position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 1100 }}>
+              <GitHubConnect user={user} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div 
                 style={{
                   width: '40px',
@@ -410,6 +414,7 @@ function App() {
                   </div>
                 </div>
               )}
+            </div>
             </div>
           </header>
 
@@ -752,6 +757,7 @@ function App() {
             <Routes>
               <Route path="/admin" element={<AdminDashboard user={user} onLogout={handleLogout} />} />
               <Route path="/user" element={<UserDashboard user={user} onLogout={handleLogout} profileOpen={sidebarProfileOpen} setProfileOpen={setSidebarProfileOpen} profileRef={sidebarProfileRef} />} />
+              <Route path="/oauth/callback" element={<OAuthCallback />} />
               <Route path="/" element={<Navigate to="/user" />} />
             </Routes>
           </div>

@@ -250,3 +250,26 @@ def update_project_item(db: Session, entry_id: int, description: str):
     except Exception as e:
         db.rollback()
         raise Exception(f"Error updating project item: {str(e)}")
+
+
+# ==================== GITHUB OAUTH CRUD OPERATIONS ====================
+
+def get_user(db: Session, user_id: int):
+    """Get a user by ID"""
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+def update_user_github_token(db: Session, user_id: int, token: str, github_username: str):
+    """Update user's GitHub OAuth token and username"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user:
+            user.github_oauth_token = token
+            user.github_username = github_username
+            db.commit()
+            db.refresh(user)
+            logging.info(f"GitHub token updated for user: {user.email}, username: {github_username}")
+        return user
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating GitHub token: {e}")
+        raise

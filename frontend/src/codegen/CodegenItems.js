@@ -6,16 +6,31 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showGitHubModal, setShowGitHubModal] = useState(false);
-  const [githubToken, setGithubToken] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState(null);
+  const [isGitHubConnected, setIsGitHubConnected] = useState(false);
+  const [githubUsername, setGithubUsername] = useState(null);
   const API_URL = 'http://localhost:8000';
 
   useEffect(() => {
     if (projectId) {
       fetchCodegenItems();
+      checkGitHubConnection();
     }
   }, [projectId]);
+
+  const checkGitHubConnection = async () => {
+    try {
+      const response = await fetch(`${API_URL}/github/status/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsGitHubConnected(data.connected);
+        setGithubUsername(data.github_username);
+      }
+    } catch (error) {
+      console.error('Error checking GitHub connection:', error);
+    }
+  };
 
   const fetchCodegenItems = async () => {
     try {
@@ -66,19 +81,17 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
   };
 
   const handleCodeGeneration = () => {
-    // Show GitHub token modal
+    if (!isGitHubConnected) {
+      alert('Please connect your GitHub account first. Click the "Connect GitHub" button in the header.');
+      return;
+    }
+    // Show generation confirmation modal
     setShowGitHubModal(true);
-    setGithubToken('');
   };
 
   const handleGenerateCode = async () => {
-    if (!githubToken.trim()) {
-      alert('Please enter a valid GitHub access token');
-      return;
-    }
-
     setIsGenerating(true);
-    setGenerationStatus('Generating code...');
+    setGenerationStatus('Generating code and pushing to GitHub...');
 
     try {
       const response = await fetch(`${API_URL}/codegen/generate`, {
@@ -90,7 +103,7 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
           project_id: projectId,
           user_id: userId,
           app_name: appName,
-          github_token: githubToken,
+          // Note: github_token is optional - backend will use stored token
         }),
       });
 
@@ -106,7 +119,6 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
         setShowGitHubModal(false);
         setIsGenerating(false);
         setGenerationStatus(null);
-        setGithubToken('');
       }, 3000);
     } catch (err) {
       console.error('Error generating code:', err);
@@ -190,7 +202,7 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
         </button>
       </div>
 
-      {/* GitHub Token Modal */}
+      {/* GitHub Connection Modal */}
       {showGitHubModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -207,19 +219,11 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
                   </p>
                   
                   <div className="form-group">
-                    <label htmlFor="github-token">GitHub Personal Access Token:</label>
-                    <input
-                      id="github-token"
-                      type="password"
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="token-input"
-                      disabled={isGenerating}
-                    />
-                    <p className="token-hint">
-                      Create a token with 'repo' scope at: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">github.com/settings/tokens</a>
-                    </p>
+                    <label>Connected GitHub Account:</label>
+                    <div className="github-account-display">
+                      <span className="status-indicator">✓</span>
+                      <span className="account-name">{githubUsername}</span>
+                    </div>
                   </div>
 
                   <div className="generation-info">
@@ -243,7 +247,7 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
                   <button 
                     className="btn-generate" 
                     onClick={handleGenerateCode}
-                    disabled={isGenerating || !githubToken.trim()}
+                    disabled={isGenerating}
                   >
                     {isGenerating ? 'Generating...' : 'Generate & Push'}
                   </button>

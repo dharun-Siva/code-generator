@@ -20,6 +20,7 @@ class ChangePassword(BaseModel):
 
 class UserOut(UserBase):
     id: int
+    github_username: Optional[str] = None
     class Config:
         from_attributes = True
 

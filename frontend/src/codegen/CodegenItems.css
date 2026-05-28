@@ -491,6 +491,36 @@
   line-height: 1.6;
 }
 
+.github-account-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f0f7ff;
+  border: 2px solid #238636;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #238636;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.account-name {
+  font-weight: 500;
+  color: #238636;
+  font-size: 15px;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .codegen-items-container {
