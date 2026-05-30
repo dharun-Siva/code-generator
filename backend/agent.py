@@ -2,7 +2,7 @@ import os
 from groq import Groq
 from dotenv import load_dotenv
 import traceback
-from PyPDF2 import PdfReader
+import pdfplumber
 from io import BytesIO
 
 load_dotenv()
@@ -118,10 +118,10 @@ class AIAgent:
         """Extract text from PDF file"""
         try:
             pdf_file = BytesIO(pdf_content)
-            reader = PdfReader(pdf_file)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+            with pdfplumber.open(pdf_file) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    text += page.extract_text() + "\n"
             return text.strip()
         except Exception as e:
             print(f"ERROR in extract_pdf_text: {str(e)}")
@@ -247,6 +247,269 @@ class AIAgent:
     def reset_pdf(self):
         """Clear the stored PDF content"""
         self.current_pdf_content = None
+    
+    def get_page_summaries(self, pdf_content: bytes) -> dict:
+        """Extract each page of PDF and generate a summary for each page
+        
+        Returns:
+            {
+                "total_pages": int,
+                "page_summaries": [
+                    {
+                        "page_number": 1,
+                        "summary": "Page summary text"
+                    },
+                    ...
+                ]
+            }
+        """
+        try:
+            pdf_file = BytesIO(pdf_content)
+            page_summaries = []
+            
+            with pdfplumber.open(pdf_file) as pdf:
+                total_pages = len(pdf.pages)
+                
+                for page_num, page in enumerate(pdf.pages, 1):
+                    # Extract text from this page
+                    page_text = page.extract_text()
+                    
+                    if not page_text or not page_text.strip():
+                        page_summaries.append({
+                            "page_number": page_num,
+                            "summary": "[Empty page - no text to summarize]"
+                        })
+                        continue
+                    
+                    # Truncate if too long for API
+                    if len(page_text) > 4000:
+                        page_text = page_text[:4000]
+                    
+                    # Generate summary for this page using AI
+                    try:
+                        system_prompt = """You are an expert document analyst. 
+                        Provide a clear, concise summary of the given page content.
+                        The summary should be 2-4 sentences capturing the main points."""
+                        
+                        messages = [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Summarize this page content:\n\n{page_text}"}
+                        ]
+                        
+                        response = self.client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            temperature=0.7,
+                            max_tokens=512,
+                        )
+                        
+                        summary = response.choices[0].message.content.strip()
+                    except Exception as e:
+                        print(f"ERROR summarizing page {page_num}: {str(e)}")
+                        summary = f"[Error generating summary: {str(e)}]"
+                    
+                    page_summaries.append({
+                        "page_number": page_num,
+                        "summary": summary
+                    })
+            
+            return {
+                "total_pages": total_pages,
+                "page_summaries": page_summaries
+            }
+        except Exception as e:
+            print(f"ERROR in get_page_summaries: {str(e)}")
+            traceback.print_exc()
+            raise
+    
+    def generate_epics_from_summaries(self, page_summaries: list, total_pages: int) -> dict:
+        """Generate epic structure with stories from page summaries
+        
+        Args:
+            page_summaries: List of page summary objects with page_number and summary
+            total_pages: Total number of pages in PDF
+            
+        Returns:
+            {
+                "epics": [
+                    {
+                        "epic_id": 1,
+                        "title": "Epic Name",
+                        "page_range": "1-2",
+                        "stories": [
+                            {
+                                "story_id": 1,
+                                "title": "Story Title",
+                                "summary": "One to two line summary"
+                            }
+                        ]
+                    }
+                ]
+            }
+        """
+        try:
+            # Prepare summaries text for AI
+            summaries_text = ""
+            for ps in page_summaries:
+                summaries_text += f"Page {ps['page_number']}:\n{ps['summary']}\n\n"
+            
+            system_prompt = """You are an expert in agile methodology and creating epics and user stories.
+            
+Based on the provided page summaries, create a structured epic breakdown:
+- Group related pages into epics
+- For each epic, create 3-5 user stories
+- Each story should be 1-2 lines (one-liner format)
+- Return ONLY valid JSON (no markdown, no code blocks)
+
+Format EXACTLY like this:
+{
+    "epics": [
+        {
+            "epic_id": 1,
+            "title": "Epic Name",
+            "page_range": "1-2",
+            "stories": [
+                {
+                    "story_id": 1,
+                    "title": "Story Title",
+                    "summary": "Brief one-liner summary of what the user can do"
+                },
+                {
+                    "story_id": 2,
+                    "title": "Story Title",
+                    "summary": "Brief one-liner summary"
+                }
+            ]
+        }
+    ]
+}
+
+IMPORTANT: Return ONLY the JSON object, nothing else."""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Create epics and stories from these page summaries:\n\n{summaries_text}"}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2048,
+            )
+            
+            import json
+            raw_response = response.choices[0].message.content.strip()
+            
+            try:
+                result = json.loads(raw_response)
+            except json.JSONDecodeError:
+                # Try removing markdown code blocks
+                if "```json" in raw_response:
+                    raw_response = raw_response.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_response:
+                    raw_response = raw_response.split("```")[1].split("```")[0].strip()
+                result = json.loads(raw_response)
+            
+            return result
+        except Exception as e:
+            print(f"ERROR in generate_epics_from_summaries: {str(e)}")
+            traceback.print_exc()
+            raise
+    
+    def generate_full_story(self, epic_title: str, story_title: str, story_summary: str, page_summaries: list) -> dict:
+        """Generate full story details including acceptance criteria and technical details
+        
+        Args:
+            epic_title: Name of the epic this story belongs to
+            story_title: Title of the story
+            story_summary: One-liner summary
+            page_summaries: Original page summaries for context
+            
+        Returns:
+            {
+                "epic": "Epic Name",
+                "story": "Story Name",
+                "summary": "One-liner",
+                "description": "Full description",
+                "acceptance_criteria": ["Criteria 1", "Criteria 2", ...],
+                "story_points": 5,
+                "technical_notes": "Technical implementation notes"
+            }
+        """
+        try:
+            # Prepare context from page summaries
+            summaries_text = ""
+            for ps in page_summaries:
+                summaries_text += f"Page {ps['page_number']}:\n{ps['summary']}\n\n"
+            
+            system_prompt = """You are an expert product manager and story analyst.
+            
+Generate a detailed user story with ALL required information.
+Return ONLY valid JSON (no markdown).
+
+IMPORTANT: Ensure the story is COMPLETE with:
+- Detailed description (3-4 sentences)
+- At least 3-4 acceptance criteria
+- Realistic story points (3-8)
+- Technical implementation notes
+
+Return format EXACTLY:
+{
+    "epic": "Epic Name",
+    "story": "Story Name",
+    "summary": "One-liner",
+    "description": "Detailed description of what the user can do",
+    "acceptance_criteria": [
+        "User can do X",
+        "System validates Y",
+        "Error handling for Z"
+    ],
+    "story_points": 5,
+    "technical_notes": "Implementation notes and technical details"
+}
+
+IMPORTANT: Return ONLY JSON, nothing else."""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"""Based on these page summaries, generate a complete story:
+
+Epic: {epic_title}
+Story: {story_title}
+Summary: {story_summary}
+
+Context from pages:
+{summaries_text}
+
+Generate the full story with all details."""}
+            ]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1024,
+            )
+            
+            import json
+            raw_response = response.choices[0].message.content.strip()
+            
+            try:
+                result = json.loads(raw_response)
+            except json.JSONDecodeError:
+                # Try removing markdown code blocks
+                if "```json" in raw_response:
+                    raw_response = raw_response.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_response:
+                    raw_response = raw_response.split("```")[1].split("```")[0].strip()
+                result = json.loads(raw_response)
+            
+            return result
+        except Exception as e:
+            print(f"ERROR in generate_full_story: {str(e)}")
+            traceback.print_exc()
+            raise
     
     def generate_code(self, prompt: str, language: str = "python", max_tokens: int = 2048) -> str:
         """Generate complete, production-ready code for a given requirement

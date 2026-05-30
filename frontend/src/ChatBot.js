@@ -14,11 +14,17 @@ const ChatBot = forwardRef((props, ref) => {
   const [selectedPdfFile, setSelectedPdfFile] = useState(null);  // Store selected PDF file
   const [showPdfName, setShowPdfName] = useState(false);  // Toggle to show PDF name
   
+  // Page summary state - for epic grooming
+  const [currentPageSummaries, setCurrentPageSummaries] = useState(null);  // Store page summaries
+  const [totalPages, setTotalPages] = useState(0);  // Total pages from PDF
+  
   // Epic generation state
   const [pendingEpic, setPendingEpic] = useState(null);  // Epic waiting for approval
   const [pendingStories, setPendingStories] = useState([]);  // Stories waiting for approval
+  const [currentEpics, setCurrentEpics] = useState(null);  // Generated epics
   const [approvalMode, setApprovalMode] = useState(false);  // Whether in approval mode
   const [currentDocumentId, setCurrentDocumentId] = useState(null);  // Document ID for saving
+  const [epicApprovalMode, setEpicApprovalMode] = useState(false);  // Waiting for epic confirmation
   
   // Chat list and user state
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -286,18 +292,17 @@ const ChatBot = forwardRef((props, ref) => {
       let aiResponse;
       let hasEpicData = false;
       
-      // If PDF is selected, upload it to get AI analysis + generate epics (FIRST TIME)
+      // If PDF is selected, upload it to get page-wise summaries (FIRST TIME)
       if (selectedPdfFile) {
         console.log('Processing PDF:', selectedPdfFile.name);
         
-        // ========== REQUEST 1: Get AI text analysis for display ==========
+        // ========== REQUEST 1: Get page-wise summaries ==========
         const formData1 = new FormData();
         formData1.append('file', selectedPdfFile);
         
-        const encodedQuestion = encodeURIComponent(userMessage.trim() || "");
-        const pdfAnalysisUrl = `${API_URL}/agent/pdf/ask?question=${encodedQuestion}`;
+        const pdfAnalysisUrl = `${API_URL}/agent/pdf/page-summaries`;
         
-        console.log('Step 1: Calling AI analysis endpoint...');
+        console.log('Step 1: Calling page-summaries endpoint...');
         const analysisResponse = await fetch(pdfAnalysisUrl, {
           method: 'POST',
           body: formData1
@@ -308,15 +313,74 @@ const ChatBot = forwardRef((props, ref) => {
         }
         
         const analysisData = await analysisResponse.json();
-        aiResponse = analysisData.response;
-        console.log('Step 1 Complete: Got AI response');
+        
+        // Store page summaries for epic generation
+        setCurrentPageSummaries(analysisData.page_summaries);
+        setTotalPages(analysisData.total_pages);
+        
+        // Format page-wise summaries for display
+        let summaryText = `📄 **PDF Analysis: ${selectedPdfFile.name}**\n\n`;
+        summaryText += `Total Pages: ${analysisData.total_pages}\n\n`;
+        summaryText += `---\n\n`;
+        
+        analysisData.page_summaries.forEach((page) => {
+          summaryText += `**Page ${page.page_number}:**\n`;
+          summaryText += `${page.summary}\n\n`;
+        });
+        
+        summaryText += `\n---\n\n**📋 To generate epic summaries, ask for "epic summary"**`;
+        
+        aiResponse = summaryText;
+        console.log('Step 1 Complete: Got page summaries');
         
         // Mark PDF as loaded in backend for follow-up questions
         setPdfLoaded(true);
         
         // Clear the selected file after sending (but keep pdfLoaded = true)
         setSelectedPdfFile(null);
-      } 
+      }
+      // If user asks for epic summary
+      else if (pdfLoaded && currentPageSummaries && userMessage.toLowerCase().includes('epic')) {
+        console.log('Generating epic summary...');
+        
+        try {
+          const epicResponse = await fetch(`${API_URL}/agent/epics/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              page_summaries: currentPageSummaries,
+              total_pages: totalPages
+            })
+          });
+
+          if (!epicResponse.ok) {
+            throw new Error('Failed to generate epics');
+          }
+
+          const epicData = await epicResponse.json();
+          setCurrentEpics(epicData.epics);
+          setEpicApprovalMode(true);
+          
+          // Format epics for display
+          let epicText = `🏗️ **Generated Epics & Stories**\n\n`;
+          
+          epicData.epics.forEach((epic) => {
+            epicText += `**Epic ${epic.epic_id}: ${epic.title}** (Pages ${epic.page_range})\n\n`;
+            epic.stories.forEach((story) => {
+              epicText += `  📖 Story ${story.story_id}: ${story.title}\n`;
+              epicText += `     ${story.summary}\n\n`;
+            });
+          });
+          
+          epicText += `\n---\n\n✅ **Please review and confirm to proceed with full story generation**`;
+          
+          aiResponse = epicText;
+          console.log('Epic structure generated');
+        } catch (err) {
+          console.error('Error generating epics:', err);
+          aiResponse = `Error generating epics: ${err.message}`;
+        }
+      }
       // If PDF is loaded (follow-up question about already analyzed PDF)
       else if (pdfLoaded && userMessage.trim()) {
         console.log('Sending follow-up question about loaded PDF');
@@ -393,6 +457,108 @@ const ChatBot = forwardRef((props, ref) => {
     setPendingEpic(null);
     setPendingStories([]);
     setApprovalMode(false);
+    setCurrentEpics(null);
+    setEpicApprovalMode(false);
+    setCurrentPageSummaries(null);
+    setTotalPages(0);
+  };
+
+  /**
+   * Handle confirming the generated epics
+   */
+  const handleConfirmEpics = async () => {
+    if (!currentEpics || !currentPageSummaries) {
+      console.error('No epics or page summaries to work with');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setEpicApprovalMode(false);
+      
+      // Add confirmation message
+      const confirmMsg = "Generating full story details for each story...";
+      const newMessages = [...messages, { sender: "bot", text: confirmMsg, type: "epic_generation" }];
+      setMessages(newMessages);
+      
+      // Process each epic and its stories
+      let allStoryDetails = [];
+      
+      for (const epic of currentEpics) {
+        for (const story of epic.stories) {
+          try {
+            const storyResponse = await fetch(`${API_URL}/agent/epics/generate-story`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                epic_title: epic.title,
+                story_title: story.title,
+                story_summary: story.summary,
+                page_summaries: currentPageSummaries
+              })
+            });
+
+            if (!storyResponse.ok) {
+              throw new Error('Failed to generate story');
+            }
+
+            const storyDetail = await storyResponse.json();
+            allStoryDetails.push({
+              epic: epic.title,
+              epicId: epic.epic_id,
+              ...storyDetail
+            });
+            
+            // Display each story as it's generated
+            let storyText = `📖 **${epic.title} - Story ${story.story_id}: ${storyDetail.story}**\n\n`;
+            storyText += `**Summary:** ${storyDetail.summary}\n\n`;
+            storyText += `**Description:** ${storyDetail.description}\n\n`;
+            storyText += `**Acceptance Criteria:**\n`;
+            storyDetail.acceptance_criteria.forEach((criteria) => {
+              storyText += `- ${criteria}\n`;
+            });
+            storyText += `\n**Story Points:** ${storyDetail.story_points}\n\n`;
+            storyText += `**Technical Notes:** ${storyDetail.technical_notes}`;
+            
+            const updatedMessages = [...newMessages, { sender: "bot", text: storyText, type: "epic_generation" }];
+            setMessages(updatedMessages);
+            newMessages.push({ sender: "bot", text: storyText, type: "epic_generation" });
+          } catch (err) {
+            console.error(`Error generating story ${story.story_id}:`, err);
+            const errorText = `❌ Error generating story: ${err.message}`;
+            const updatedMessages = [...newMessages, { sender: "bot", text: errorText, type: "error" }];
+            setMessages(updatedMessages);
+            newMessages.push({ sender: "bot", text: errorText, type: "error" });
+          }
+        }
+      }
+      
+      // Final summary
+      const summaryText = `✅ Completed generating ${allStoryDetails.length} full stories!`;
+      const finalMessages = [...newMessages, { sender: "bot", text: summaryText, type: "epic_generation" }];
+      setMessages(finalMessages);
+      saveChatToDb(finalMessages);
+      
+    } catch (error) {
+      console.error('Error confirming epics:', error);
+      const errorMsg = `Error: ${error.message}`;
+      const errorMessages = [...messages, { sender: "bot", text: errorMsg, type: "error" }];
+      setMessages(errorMessages);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle canceling epic confirmation
+   */
+  const handleCancelEpics = () => {
+    setEpicApprovalMode(false);
+    setCurrentEpics(null);
+    const cancelMsg = "Epic generation cancelled. You can ask for epic summary again if you like.";
+    const updatedMessages = [...messages, { sender: "bot", text: cancelMsg, type: "chat" }];
+    setMessages(updatedMessages);
+    saveChatToDb(updatedMessages);
   };
 
   const deleteChat = async (chatId) => {
@@ -706,6 +872,191 @@ const ChatBot = forwardRef((props, ref) => {
 
   return (
     <div className="chatbot-main" style={{ width: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* Epic Confirmation Modal */}
+        {epicApprovalMode && currentEpics && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '700px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(102, 126, 234, 0.2)',
+              animation: 'slideUp 0.3s ease'
+            }}>
+              <h2 style={{
+                color: '#fff',
+                marginBottom: '16px',
+                fontSize: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span>🏗️</span> Review Epic Structure
+              </h2>
+
+              <p style={{
+                color: '#aaa',
+                marginBottom: '24px',
+                fontSize: '0.95rem'
+              }}>
+                Please review the epics and stories below. Click "Confirm" to generate full story details.
+              </p>
+
+              {/* Epics Display */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                marginBottom: '24px',
+                maxHeight: '400px',
+                overflowY: 'auto'
+              }}>
+                {currentEpics.map((epic) => (
+                  <div key={epic.epic_id} style={{
+                    background: 'rgba(102, 126, 234, 0.1)',
+                    border: '1px solid rgba(102, 126, 234, 0.3)',
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}>
+                    <h3 style={{
+                      color: '#667eea',
+                      marginBottom: '12px',
+                      fontSize: '1.1rem'
+                    }}>
+                      Epic {epic.epic_id}: {epic.title}
+                    </h3>
+                    <p style={{
+                      color: '#aaa',
+                      fontSize: '0.9rem',
+                      marginBottom: '12px',
+                      marginTop: 0
+                    }}>
+                      Pages: {epic.page_range}
+                    </p>
+                    
+                    {/* Stories under this epic */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      marginLeft: '12px'
+                    }}>
+                      {epic.stories.map((story) => (
+                        <div key={story.story_id} style={{
+                          background: 'rgba(56, 239, 125, 0.1)',
+                          border: '1px solid rgba(56, 239, 125, 0.2)',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          borderLeft: '3px solid #38ef7d'
+                        }}>
+                          <div style={{
+                            color: '#38ef7d',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            marginBottom: '4px'
+                          }}>
+                            Story {story.story_id}: {story.title}
+                          </div>
+                          <div style={{
+                            color: '#999',
+                            fontSize: '0.85rem'
+                          }}>
+                            {story.summary}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={handleCancelEpics}
+                  disabled={loading}
+                  style={{
+                    background: 'rgba(255, 85, 85, 0.2)',
+                    border: '1px solid rgba(255, 85, 85, 0.5)',
+                    color: '#ff5555',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s ease',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.3)';
+                      e.target.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.target.style.background = 'rgba(255, 85, 85, 0.2)';
+                      e.target.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmEpics}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s ease',
+                    opacity: loading ? 0.6 : 1,
+                    boxShadow: '0 4px 12px rgba(56, 239, 125, 0.25)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 6px 16px rgba(56, 239, 125, 0.35)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(56, 239, 125, 0.25)';
+                    }
+                  }}
+                >
+                  {loading ? 'Generating...' : 'Confirm & Generate Stories'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Epic Approval Modal */}
         {approvalMode && pendingEpic && (
           <div style={{

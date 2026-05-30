@@ -160,31 +160,12 @@ def change_model(model_id: str):
 
 @app.post("/agent/pdf/ask", response_model=ChatResponse)
 async def ask_pdf_question(file: UploadFile = File(...), question: str = None):
-    """Ask a question about PDF content, or analyze if no question provided"""
-    try:
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
-        
-        # Read PDF file
-        pdf_content = await file.read()
-        
-        print(f"DEBUG: Received question: {question}")  # Debug logging
-        
-        # If no question provided or question is empty, analyze the PDF
-        if not question or question.strip() == "":
-            print("DEBUG: No question, analyzing PDF")
-            answer = agent.analyze_pdf(pdf_content)
-        else:
-            # Answer specific question about PDF
-            print(f"DEBUG: Answering question: {question}")
-            answer = agent.answer_pdf_question(pdf_content, question.strip())
-        
-        return ChatResponse(response=answer, type="pdf_question")
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"DEBUG: Error - {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """[DEPRECATED] This endpoint is deprecated. Use /agent/pdf/page-summaries instead."""
+    # DUMMY ENDPOINT - DO NOT CALL AI FUNCTIONS
+    return ChatResponse(
+        response="This endpoint is deprecated. Please use POST /agent/pdf/page-summaries to get page-wise summaries.",
+        type="deprecated"
+    )
 
 
 @app.post("/agent/pdf/followup", response_model=ChatResponse)
@@ -209,6 +190,136 @@ def reset_pdf():
     """Clear the stored PDF content"""
     agent.reset_pdf()
     return {"status": "PDF cleared successfully"}
+
+
+@app.post("/agent/pdf/page-summaries")
+async def get_pdf_page_summaries(file: UploadFile = File(...)):
+    """Extract each page of PDF and generate a summary for each page
+    
+    Returns:
+        {
+            "total_pages": int,
+            "page_summaries": [
+                {
+                    "page_number": 1,
+                    "summary": "Page 1 summary text"
+                },
+                {
+                    "page_number": 2,
+                    "summary": "Page 2 summary text"
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        # Read PDF file
+        pdf_content = await file.read()
+        
+        # Get page-wise summaries
+        result = agent.get_page_summaries(pdf_content)
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Error in page-summaries endpoint - {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== EPIC & STORY ENDPOINTS ====================
+
+class PageSummariesRequest(BaseModel):
+    page_summaries: list
+    total_pages: int
+
+class GenerateStoryRequest(BaseModel):
+    epic_title: str
+    story_title: str
+    story_summary: str
+    page_summaries: list
+
+
+@app.post("/agent/epics/generate")
+def generate_epics(request: PageSummariesRequest):
+    """Generate epic structure with stories from page summaries
+    
+    Expected input:
+    {
+        "page_summaries": [
+            {"page_number": 1, "summary": "..."},
+            {"page_number": 2, "summary": "..."},
+            ...
+        ],
+        "total_pages": 4
+    }
+    
+    Returns:
+    {
+        "epics": [
+            {
+                "epic_id": 1,
+                "title": "Epic Name",
+                "page_range": "1-2",
+                "stories": [
+                    {
+                        "story_id": 1,
+                        "title": "Story Title",
+                        "summary": "One-liner summary"
+                    }
+                ]
+            }
+        ]
+    }
+    """
+    try:
+        result = agent.generate_epics_from_summaries(request.page_summaries, request.total_pages)
+        return result
+    except Exception as e:
+        print(f"DEBUG: Error in generate_epics - {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/epics/generate-story")
+def generate_full_story(request: GenerateStoryRequest):
+    """Generate full story details for a specific story
+    
+    Expected input:
+    {
+        "epic_title": "Epic Name",
+        "story_title": "Story Title",
+        "story_summary": "One-liner summary",
+        "page_summaries": [
+            {"page_number": 1, "summary": "..."},
+            ...
+        ]
+    }
+    
+    Returns:
+    {
+        "epic": "Epic Name",
+        "story": "Story Name",
+        "summary": "One-liner",
+        "description": "Detailed description",
+        "acceptance_criteria": ["Criteria 1", "Criteria 2", ...],
+        "story_points": 5,
+        "technical_notes": "Technical details"
+    }
+    """
+    try:
+        result = agent.generate_full_story(
+            request.epic_title,
+            request.story_title,
+            request.story_summary,
+            request.page_summaries
+        )
+        return result
+    except Exception as e:
+        print(f"DEBUG: Error in generate_full_story - {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================== CHAT STORAGE ENDPOINTS ====================
