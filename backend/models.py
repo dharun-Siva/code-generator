@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -40,6 +40,7 @@ class ProjectItem(Base):
     epic_title = Column(String, nullable=False)  # Epic name for consistency across all users
     story_title = Column(String, nullable=True)  # Story name (None for epic entries)
     description = Column(Text, nullable=True, default=None)  # Not used - kept for backward compatibility
+    story_details = Column(JSON, nullable=True, default=None)  # JSON format: {summary, description, acceptance_criteria, story_points, technical_notes}
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

@@ -467,8 +467,8 @@ const ChatBot = forwardRef((props, ref) => {
    * Handle confirming the generated epics
    */
   const handleConfirmEpics = async () => {
-    if (!currentEpics || !currentPageSummaries) {
-      console.error('No epics or page summaries to work with');
+    if (!currentEpics || !currentPageSummaries || !currentUserId || !currentChatId) {
+      console.error('Missing required data');
       return;
     }
 
@@ -481,10 +481,17 @@ const ChatBot = forwardRef((props, ref) => {
       const newMessages = [...messages, { sender: "bot", text: confirmMsg, type: "epic_generation" }];
       setMessages(newMessages);
       
-      // Process each epic and its stories
+      // Prepare data for saving
+      const epicsAndStories = [];
       let allStoryDetails = [];
       
       for (const epic of currentEpics) {
+        const epicData = {
+          epic_id: epic.epic_id,
+          epic_title: epic.title,
+          stories: []
+        };
+        
         for (const story of epic.stories) {
           try {
             const storyResponse = await fetch(`${API_URL}/agent/epics/generate-story`, {
@@ -509,6 +516,19 @@ const ChatBot = forwardRef((props, ref) => {
               ...storyDetail
             });
             
+            // Add story to epic data for saving
+            epicData.stories.push({
+              story_id: story.story_id,
+              story_title: storyDetail.story,
+              story_details: {
+                summary: storyDetail.summary,
+                description: storyDetail.description,
+                acceptance_criteria: storyDetail.acceptance_criteria,
+                story_points: storyDetail.story_points,
+                technical_notes: storyDetail.technical_notes
+              }
+            });
+            
             // Display each story as it's generated
             let storyText = `📖 **${epic.title} - Story ${story.story_id}: ${storyDetail.story}**\n\n`;
             storyText += `**Summary:** ${storyDetail.summary}\n\n`;
@@ -531,10 +551,32 @@ const ChatBot = forwardRef((props, ref) => {
             newMessages.push({ sender: "bot", text: errorText, type: "error" });
           }
         }
+        
+        epicsAndStories.push(epicData);
       }
       
+      // Save all epics and stories to database
+      console.log('Saving epic and stories with details...', epicsAndStories);
+      const saveResponse = await fetch(`${API_URL}/project-items/save-story-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: currentChatId,
+          user_id: currentUserId,
+          epics_and_stories: epicsAndStories
+        })
+      });
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.detail || 'Failed to save epic and stories');
+      }
+
+      const saveResult = await saveResponse.json();
+      console.log('Save result:', saveResult);
+      
       // Final summary
-      const summaryText = `✅ Completed generating ${allStoryDetails.length} full stories!`;
+      const summaryText = `✅ Completed! Generated and saved ${allStoryDetails.length} full stories with details!`;
       const finalMessages = [...newMessages, { sender: "bot", text: summaryText, type: "epic_generation" }];
       setMessages(finalMessages);
       saveChatToDb(finalMessages);

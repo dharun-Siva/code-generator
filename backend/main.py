@@ -243,6 +243,13 @@ class GenerateStoryRequest(BaseModel):
     page_summaries: list
 
 
+class SaveStoryDetailsRequest(BaseModel):
+    """Request to save epic and stories with full details"""
+    project_id: int
+    user_id: int
+    epics_and_stories: list  # List of {epic_id, epic_title, stories: [{story_id, story_title, story_details: {...}}]}
+
+
 @app.post("/agent/epics/generate")
 def generate_epics(request: PageSummariesRequest):
     """Generate epic structure with stories from page summaries
@@ -419,6 +426,94 @@ def batch_save_project_items(batch_data: schemas.BatchSaveProjectItem, db: Sessi
         }
     except Exception as e:
         print(f"ERROR in batch_save: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/project-items/save-story-details")
+def save_epic_and_stories_with_details(request: SaveStoryDetailsRequest, db: Session = Depends(get_db)):
+    """Save epics and stories with full story details to project_items table
+    
+    Expected format:
+    {
+        "project_id": 1,
+        "user_id": 5,
+        "epics_and_stories": [
+            {
+                "epic_id": 1,
+                "epic_title": "Epic Name",
+                "stories": [
+                    {
+                        "story_id": 1,
+                        "story_title": "Story 1 Title",
+                        "story_details": {
+                            "summary": "...",
+                            "description": "...",
+                            "acceptance_criteria": [...],
+                            "story_points": 5,
+                            "technical_notes": "..."
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    """
+    try:
+        saved_entries = []
+        
+        for epic_data in request.epics_and_stories:
+            epic_id = epic_data.get("epic_id")
+            epic_title = epic_data.get("epic_title")
+            stories = epic_data.get("stories", [])
+            
+            # Save epic entry (story_title=None, story_details=None)
+            epic_entry = models.ProjectItem(
+                project_id=request.project_id,
+                user_id=request.user_id,
+                epic_id=epic_id,
+                story_id=0,  # 0 indicates this is an epic entry
+                epic_title=epic_title,
+                story_title=None,
+                story_details=None
+            )
+            db.add(epic_entry)
+            db.flush()
+            saved_entries.append(epic_entry)
+            
+            # Save each story entry with story_details
+            for story in stories:
+                story_id = story.get("story_id")
+                story_title = story.get("story_title")
+                story_details = story.get("story_details")
+                
+                # SQLAlchemy JSON type handles serialization automatically
+                story_entry = models.ProjectItem(
+                    project_id=request.project_id,
+                    user_id=request.user_id,
+                    epic_id=epic_id,
+                    story_id=story_id,
+                    epic_title=epic_title,
+                    story_title=story_title,
+                    story_details=story_details
+                )
+                db.add(story_entry)
+                db.flush()
+                saved_entries.append(story_entry)
+        
+        db.commit()
+        
+        print(f"✓ Successfully saved {len(saved_entries)} entries (epics + stories)")
+        
+        return {
+            "status": "success",
+            "message": f"Successfully saved all epics and stories with details",
+            "total_entries": len(saved_entries),
+            "project_id": request.project_id
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"ERROR in save_epic_and_stories_with_details: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
