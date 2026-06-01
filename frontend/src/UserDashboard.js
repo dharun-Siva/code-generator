@@ -2,6 +2,7 @@ import React from 'react';
 import ChatBot from './ChatBot';
 import Sidebar from './Sidebar';
 import CodegenItems from './codegen/CodegenItems';
+import ImpactAnalysis from './ImpactAnalysis';
 import { useRef, useState, useEffect } from 'react';
 import './UserDashboard.css';
 
@@ -19,6 +20,9 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   const [searchTerm, setSearchTerm] = useState("");
   const [dashboardSearchTerm, setDashboardSearchTerm] = useState("");
   const [showDashboardDialog, setShowDashboardDialog] = useState(false);
+  const [showImpactAnalysis, setShowImpactAnalysis] = useState(false);
+  const [showCodegenImplementation, setShowCodegenImplementation] = useState(false);
+  const [selectedStoryIds, setSelectedStoryIds] = useState([]);
 
   const API_URL = 'http://localhost:8000';
 
@@ -53,6 +57,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     setShowAppDashboard(false);
     setSelectedAppId(null);
     setSelectedWorkflowType(null);
+    setShowImpactAnalysis(false);
   };
 
   // Handler to show dashboard
@@ -127,6 +132,13 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     loadChats();
   };
 
+  // Handler for Generate Code from Impact Analysis
+  const handleGenerateCode = (storyIds) => {
+    setSelectedStoryIds(storyIds);
+    setShowImpactAnalysis(false);
+    setShowCodegenImplementation(true);
+  };
+
   return (
     <div style={{ position: 'relative', display: 'flex', width: '100%', minHeight: 'calc(100vh - 100px)' }}>
       <Sidebar 
@@ -142,7 +154,30 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
         onDashboard={handleDashboard}
       />
       <div style={{ flex: 1, padding: '2rem', marginLeft: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' }}>
-        {showDashboardDialog ? (
+        {showCodegenImplementation ? (
+          <CodegenItems
+            projectId={selectedAppId}
+            userId={user?.id}
+            appName={chats.find(c => c.id === selectedAppId)?.title || 'Application'}
+            selectedStoryIds={selectedStoryIds}
+            onBack={() => {
+              setShowCodegenImplementation(false);
+              setShowImpactAnalysis(true);
+              setSelectedStoryIds([]);
+            }}
+          />
+        ) : showImpactAnalysis ? (
+          <ImpactAnalysis
+            projectId={selectedAppId}
+            userId={user?.id}
+            appName={chats.find(c => c.id === selectedAppId)?.title || 'Application'}
+            onBack={() => {
+              setShowImpactAnalysis(false);
+              setShowAppDashboard(true);
+            }}
+            onGenerateCode={handleGenerateCode}
+          />
+        ) : showDashboardDialog ? (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -155,13 +190,13 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
               backgroundColor: 'white',
               borderRadius: '12px',
               padding: '3rem',
-              maxWidth: '700px',
+              maxWidth: '1000px',
               width: '100%',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
             }}>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: '1fr 1fr 1fr',
                 gap: '1.5rem'
               }}>
                 <div style={{
@@ -187,6 +222,32 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
                   }}>📖</div>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#3f51b5', fontSize: '18px', fontWeight: '600' }}>Story Grooming</h3>
                   <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Prepare and refine stories</p>
+                </div>
+                
+                <div style={{
+                  padding: '2rem',
+                  border: '2px solid #3f51b5',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backgroundColor: '#f5f7ff'
+                }}
+                onClick={() => setShowImpactAnalysis(true)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(63, 81, 181, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}>
+                  <div style={{
+                    fontSize: '32px',
+                    marginBottom: '1rem'
+                  }}>📊</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#3f51b5', fontSize: '18px', fontWeight: '600' }}>Impact Analysis</h3>
+                  <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Analyze system impact</p>
                 </div>
                 
                 <div style={{
@@ -241,7 +302,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
               
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: '1fr 1fr 1fr',
                 gap: '1.5rem'
               }}>
                 <div style={{
@@ -268,6 +329,32 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
                   }}>📖</div>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#3f51b5', fontSize: '18px', fontWeight: '600' }}>Story Grooming</h3>
                   <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Prepare and refine stories</p>
+                </div>
+                
+                <div style={{
+                  padding: '2rem',
+                  border: '2px solid #3f51b5',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backgroundColor: '#f5f7ff'
+                }}
+                onClick={() => setShowImpactAnalysis(true)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(63, 81, 181, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}>
+                  <div style={{
+                    fontSize: '32px',
+                    marginBottom: '1rem'
+                  }}>📊</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#3f51b5', fontSize: '18px', fontWeight: '600' }}>Impact Analysis</h3>
+                  <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Analyze system impact</p>
                 </div>
                 
                 <div style={{

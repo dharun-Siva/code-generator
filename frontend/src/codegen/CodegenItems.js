@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './CodegenItems.css';
 
-const CodegenItems = ({ projectId, userId, appName, onBack }) => {
+const CodegenItems = ({ projectId, userId, appName, selectedStoryIds, onBack }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -43,28 +43,41 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
       
       // Flatten the grouped data into a list of items
       const itemsList = [];
+      const selectedStoryIdsSet = new Set(selectedStoryIds || []);
+      const hasFiltering = (selectedStoryIds?.length ?? 0) > 0;
+      
       if (data.epics) {
         Object.entries(data.epics).forEach(([epicId, epicData]) => {
-          // Add epic
-          if (epicData.epic) {
+          // Collect all stories for this epic to check if any are selected
+          const epicStories = epicData.stories || [];
+          const hasSelectedStories = epicStories.some(story => selectedStoryIdsSet.has(story.id));
+          
+          // Add epic if it has selected stories (or if no filtering is applied)
+          if (epicData.epic && (!hasFiltering || hasSelectedStories)) {
             itemsList.push({
               id: epicData.epic.id,
               type: 'epic',
               title: epicData.epic.epic_title,
               epicId: epicData.epic.epic_id,
+              selected: true
             });
           }
           
-          // Add stories
+          // Add stories - filter by selectedStoryIds if provided
           if (epicData.stories && epicData.stories.length > 0) {
             epicData.stories.forEach(story => {
-              itemsList.push({
-                id: story.id,
-                type: 'story',
-                title: story.story_title,
-                epicId: story.epic_id,
-                epicTitle: story.epic_title,
-              });
+              const isSelected = selectedStoryIdsSet.has(story.id);
+              // Include story if: no selection filter applied OR this story is in the selected list
+              if (!hasFiltering || isSelected) {
+                itemsList.push({
+                  id: story.id,
+                  type: 'story',
+                  title: story.story_title,
+                  epicId: story.epic_id,
+                  epicTitle: story.epic_title,
+                  selected: isSelected
+                });
+              }
             });
           }
         });
@@ -94,17 +107,24 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
     setGenerationStatus('Generating code and pushing to GitHub...');
 
     try {
+      const payload = {
+        project_id: projectId,
+        user_id: userId,
+        app_name: appName,
+        // Note: github_token is optional - backend will use stored token
+      };
+      
+      // Add story_ids if they were selected
+      if (selectedStoryIds && selectedStoryIds.length > 0) {
+        payload.story_ids = selectedStoryIds;
+      }
+      
       const response = await fetch(`${API_URL}/codegen/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          project_id: projectId,
-          user_id: userId,
-          app_name: appName,
-          // Note: github_token is optional - backend will use stored token
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -162,6 +182,19 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
       </div>
 
       <div className="codegen-action-bar">
+        {(selectedStoryIds?.length ?? 0) > 0 && (
+          <div style={{
+            flex: 1,
+            padding: '0.5rem 1rem',
+            backgroundColor: '#e3f2fd',
+            borderRadius: '4px',
+            marginRight: '1rem',
+            fontSize: '14px',
+            color: '#1976d2'
+          }}>
+            📌 <strong>{selectedStoryIds.length}</strong> stories selected for code generation
+          </div>
+        )}
         <button 
           className="generate-code-btn" 
           onClick={handleCodeGeneration}
@@ -180,12 +213,26 @@ const CodegenItems = ({ projectId, userId, appName, onBack }) => {
       ) : (
         <div className="codegen-items-list">
           {items.map((item, index) => (
-            <div key={item.id} className={`codegen-item ${item.type}`}>
+            <div key={item.id} className={`codegen-item ${item.type} ${item.selected ? 'selected' : ''}`}>
               <div className="item-icon">
                 {item.type === 'epic' ? '📚' : '📖'}
               </div>
               <div className="item-content">
-                <div className="item-type-badge">{item.type === 'epic' ? 'EPIC' : 'STORY'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="item-type-badge">{item.type === 'epic' ? 'EPIC' : 'STORY'}</div>
+                  {item.selected && (
+                    <span style={{
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}>
+                      ✓ Selected
+                    </span>
+                  )}
+                </div>
                 <h3 className="item-title">{item.title}</h3>
                 {item.type === 'story' && (
                   <p className="item-epic-reference">Part of: <strong>{item.epicTitle}</strong></p>

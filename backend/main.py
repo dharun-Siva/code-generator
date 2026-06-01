@@ -590,6 +590,210 @@ def delete_project_items_by_epic_endpoint(project_id: int, epic_id: int, db: Ses
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== MICROSERVICE ANALYSIS ENDPOINTS ====================
+
+@app.get("/microservice-analysis/{project_id}")
+def analyze_microservices(project_id: int, story_ids: Optional[str] = None, db: Session = Depends(get_db)):
+    """Analyze project structure and suggest microservice breakdown"""
+    try:
+        from codegen.microservice_analyzer import MicroserviceAnalyzer
+        
+        # Parse story_ids if provided
+        selected_story_ids = None
+        if story_ids:
+            try:
+                selected_story_ids = set(int(sid.strip()) for sid in story_ids.split(',') if sid.strip())
+            except ValueError:
+                selected_story_ids = None
+        
+        # Get all project items for the project
+        all_items = crud.get_all_project_items(db, project_id)
+        
+        # Group by epic_id
+        grouped = {}
+        for item in all_items:
+            if item.epic_id not in grouped:
+                grouped[item.epic_id] = {"epic": None, "stories": []}
+            
+            if item.story_id == 0:
+                # Convert ORM object to dictionary
+                grouped[item.epic_id]["epic"] = {
+                    "epic_title": item.epic_title,
+                    "description": getattr(item, "description", "")
+                }
+            else:
+                # Only include stories if story_ids is not provided or story is in the selection
+                if selected_story_ids is None or item.story_id in selected_story_ids:
+                    grouped[item.epic_id]["stories"].append({
+                        "story_title": item.story_title,
+                        "story_id": item.story_id,
+                        "description": getattr(item, "description", "")
+                    })
+        
+        # Remove epics with no stories after filtering
+        if selected_story_ids is not None:
+            grouped = {epic_id: epic_data for epic_id, epic_data in grouped.items() if epic_data["stories"]}
+        
+        epics_data = {
+            "project_id": project_id,
+            "epics": grouped
+        }
+        
+        print(f"DEBUG: epics_data keys = {epics_data.keys()}")
+        print(f"DEBUG: grouped keys = {grouped.keys()}")
+        if grouped:
+            first_epic_id = list(grouped.keys())[0]
+            print(f"DEBUG: first epic type = {type(grouped[first_epic_id])}")
+            print(f"DEBUG: first epic epic type = {type(grouped[first_epic_id].get('epic'))}")
+        
+        # Analyze microservices
+        analyzer = MicroserviceAnalyzer()
+        analysis = analyzer.analyze(epics_data)
+        
+        return analysis
+    except Exception as e:
+        print(f"ERROR in analyze_microservices: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/frontend-analysis/{project_id}")
+def analyze_frontend(project_id: int, story_ids: Optional[str] = None, db: Session = Depends(get_db)):
+    """Analyze project structure and preview frontend (pages and components) that will be generated"""
+    try:
+        from codegen.frontend_analyzer import FrontendAnalyzer
+        from codegen.microservice_analyzer import MicroserviceAnalyzer
+        
+        # Parse story_ids if provided
+        selected_story_ids = None
+        if story_ids:
+            try:
+                selected_story_ids = set(int(sid.strip()) for sid in story_ids.split(',') if sid.strip())
+            except ValueError:
+                selected_story_ids = None
+        
+        # Get all project items for the project
+        all_items = crud.get_all_project_items(db, project_id)
+        
+        # Group by epic_id
+        grouped = {}
+        for item in all_items:
+            if item.epic_id not in grouped:
+                grouped[item.epic_id] = {"epic": None, "stories": []}
+            
+            if item.story_id == 0:
+                # Convert ORM object to dictionary
+                grouped[item.epic_id]["epic"] = {
+                    "epic_title": item.epic_title,
+                    "description": getattr(item, "description", "")
+                }
+            else:
+                # Only include stories if story_ids is not provided or story is in the selection
+                if selected_story_ids is None or item.story_id in selected_story_ids:
+                    grouped[item.epic_id]["stories"].append({
+                        "story_title": item.story_title,
+                        "story_id": item.story_id,
+                        "description": getattr(item, "description", "")
+                    })
+        
+        # Remove epics with no stories after filtering
+        if selected_story_ids is not None:
+            grouped = {epic_id: epic_data for epic_id, epic_data in grouped.items() if epic_data["stories"]}
+        
+        epics_data = {
+            "project_id": project_id,
+            "epics": grouped
+        }
+        
+        # First, analyze microservices to get the architecture
+        microservice_analyzer = MicroserviceAnalyzer()
+        microservice_analysis = microservice_analyzer.analyze(epics_data)
+        microservices = microservice_analysis.get("microservices", [])
+        
+        # Then, analyze frontend structure with microservice coordination
+        analyzer = FrontendAnalyzer()
+        analysis = analyzer.analyze(epics_data, microservices)
+        
+        # Add microservice info to the response for transparency
+        analysis["microservices_reference"] = microservices
+        
+        return analysis
+    except Exception as e:
+        print(f"ERROR in analyze_frontend: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/database-analysis/{project_id}")
+def analyze_database(project_id: int, story_ids: Optional[str] = None, db: Session = Depends(get_db)):
+    """Analyze project structure and preview database (tables and relationships) that will be generated"""
+    try:
+        from codegen.database_analyzer import DatabaseAnalyzer
+        from codegen.microservice_analyzer import MicroserviceAnalyzer
+        
+        # Parse story_ids if provided
+        selected_story_ids = None
+        if story_ids:
+            try:
+                selected_story_ids = set(int(sid.strip()) for sid in story_ids.split(',') if sid.strip())
+            except ValueError:
+                selected_story_ids = None
+        
+        # Get all project items for the project
+        all_items = crud.get_all_project_items(db, project_id)
+        
+        # Group by epic_id
+        grouped = {}
+        for item in all_items:
+            if item.epic_id not in grouped:
+                grouped[item.epic_id] = {"epic": None, "stories": []}
+            
+            if item.story_id == 0:
+                # Convert ORM object to dictionary
+                grouped[item.epic_id]["epic"] = {
+                    "epic_title": item.epic_title,
+                    "description": getattr(item, "description", "")
+                }
+            else:
+                # Only include stories if story_ids is not provided or story is in the selection
+                if selected_story_ids is None or item.story_id in selected_story_ids:
+                    grouped[item.epic_id]["stories"].append({
+                        "story_title": item.story_title,
+                        "story_id": item.story_id,
+                        "description": getattr(item, "description", "")
+                    })
+        
+        # Remove epics with no stories after filtering
+        if selected_story_ids is not None:
+            grouped = {epic_id: epic_data for epic_id, epic_data in grouped.items() if epic_data["stories"]}
+        
+        epics_data = {
+            "project_id": project_id,
+            "epics": grouped
+        }
+        
+        # First, analyze microservices to get the architecture
+        microservice_analyzer = MicroserviceAnalyzer()
+        microservice_analysis = microservice_analyzer.analyze(epics_data)
+        microservices = microservice_analysis.get("microservices", [])
+        
+        # Analyze database structure with microservice coordination
+        analyzer = DatabaseAnalyzer()
+        analysis = analyzer.analyze(epics_data, microservices)
+        
+        # Add microservice info to the response for transparency
+        analysis["microservices_reference"] = microservices
+        
+        return analysis
+    except Exception as e:
+        print(f"ERROR in analyze_database: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== CODE GENERATION ENDPOINTS ====================
 
 class CodeGenRequest(BaseModel):
@@ -597,6 +801,7 @@ class CodeGenRequest(BaseModel):
     user_id: int
     app_name: str
     github_token: Optional[str] = None  # Optional - will use stored token if not provided
+    story_ids: Optional[list[int]] = None  # Optional - if provided, generate only for these stories
 
 
 @app.post("/codegen/generate")
@@ -615,6 +820,13 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
         
         # Get all project items for the project
         all_items = crud.get_all_project_items(db, request.project_id)
+        
+        # Filter by story_ids if provided
+        if request.story_ids:
+            # Convert story_ids list to set for faster lookup
+            story_ids_set = set(request.story_ids)
+            # Keep epics (story_id == 0) and filter stories by story_ids
+            all_items = [item for item in all_items if item.story_id == 0 or item.story_id in story_ids_set]
         
         # Group by epic_id for the code generator
         grouped = {}
