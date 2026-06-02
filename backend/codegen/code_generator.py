@@ -73,7 +73,8 @@ class CodeGenerator:
         self,
         app_name: str,
         epics_and_stories: Dict,
-        github_token: str
+        analysis_results: Dict = None,
+        github_token: str = None
     ) -> Dict:
         """
         Generate complete project structure and push to GitHub
@@ -81,6 +82,10 @@ class CodeGenerator:
         Args:
             app_name: Application name
             epics_and_stories: Dictionary with epics and stories
+            analysis_results: Optional - Blueprint from Impact Analysis containing:
+                - microservice_analysis: Microservice architecture design
+                - frontend_analysis: Frontend pages and components design
+                - database_analysis: Database schema and tables design
             github_token: GitHub personal access token
         
         Returns:
@@ -110,14 +115,14 @@ class CodeGenerator:
             
             os.makedirs(project_dir, exist_ok=True)
 
-            # Generate frontend code
-            self._generate_frontend(project_dir, app_name, epics_and_stories)
+            # Generate frontend code using analysis blueprint if available
+            self._generate_frontend(project_dir, app_name, epics_and_stories, analysis_results)
             
-            # Generate backend code
-            self._generate_backend(project_dir, app_name, epics_and_stories)
+            # Generate backend code using analysis blueprint if available
+            self._generate_backend(project_dir, app_name, epics_and_stories, analysis_results)
             
-            # Generate database code
-            self._generate_database(project_dir, app_name, epics_and_stories)
+            # Generate database code using analysis blueprint if available
+            self._generate_database(project_dir, app_name, epics_and_stories, analysis_results)
             
             # Generate README
             self._generate_readme(project_dir, app_name)
@@ -260,16 +265,38 @@ function {component_name}() {{
 export default {component_name};
 '''
 
-    def _generate_entity_page(self, page_name: str, entity_name: str, stories: List[Dict]) -> str:
-        """Generate a React page for managing an entity using AI"""
+    def _generate_entity_page(self, page_name: str, entity_name: str, stories: List[Dict], analysis_results: Dict = None) -> str:
+        """Generate a React page for managing an entity using AI and analysis blueprint"""
         try:
             stories_list = ", ".join([s.get("story_title", "Story") for s in stories[:5]])
+            
+            # Extract relevant pages from frontend analysis if available
+            frontend_blueprint = ""
+            if analysis_results and analysis_results.get("frontend_analysis"):
+                try:
+                    frontend_analysis = analysis_results["frontend_analysis"]
+                    if isinstance(frontend_analysis, str):
+                        import json
+                        frontend_analysis = json.loads(frontend_analysis)
+                    
+                    # Find matching pages in the analysis
+                    if frontend_analysis.get("pages"):
+                        for page in frontend_analysis["pages"]:
+                            if page.get("name") and entity_name.lower() in page["name"].lower():
+                                frontend_blueprint = f"\nFrontend Blueprint (from analysis):\n"
+                                frontend_blueprint += f"- Page Name: {page.get('name', '')}\n"
+                                frontend_blueprint += f"- Components: {', '.join(page.get('components', []))}\n"
+                                frontend_blueprint += f"- Features: {', '.join(page.get('features', []))}\n"
+                                break
+                except Exception as e:
+                    print(f"Error parsing frontend analysis: {e}")
             
             # Use AI to generate intelligent page code
             prompt = f"""Generate a complete, production-ready React page component for managing:
 Entity: {entity_name}
 Page Name: {page_name}
 Related Stories: {stories_list}
+{frontend_blueprint}
 
 REQUIREMENTS:
 1. Full CRUD operations (Create, Read, Update, Delete)
@@ -298,11 +325,11 @@ Return ONLY the JSX page component code starting with 'import React'. NEVER impo
             return code
         except Exception as e:
             print(f"Error generating page with AI: {e}")
-            # Fallback to template
-            return self._generate_entity_page_template(page_name, entity_name, stories)
+            # Fallback to template with analysis data
+            return self._generate_entity_page_template(page_name, entity_name, stories, analysis_results)
     
-    def _generate_entity_page_template(self, page_name: str, entity_name: str, stories: List[Dict]) -> str:
-        """Fallback template for entity page"""
+    def _generate_entity_page_template(self, page_name: str, entity_name: str, stories: List[Dict], analysis_results: Dict = None) -> str:
+        """Fallback template for entity page with optional analysis blueprint"""
         stories_list = ", ".join([f'"{s.get("story_title", "Story")}"' for s in stories[:5]])
         
         return f"""import React, {{ useState, useEffect }} from 'react';
@@ -578,8 +605,8 @@ function {page_name}() {{
 export default {page_name};
 """
 
-    def _generate_frontend(self, project_dir: str, app_name: str, epics_and_stories: Dict):
-        """Generate React frontend code based on domain entities"""
+    def _generate_frontend(self, project_dir: str, app_name: str, epics_and_stories: Dict, analysis_results: Dict = None):
+        """Generate React frontend code based on domain entities and frontend analysis blueprint"""
         frontend_dir = os.path.join(project_dir, "frontend")
         os.makedirs(frontend_dir)
         
@@ -703,8 +730,8 @@ export default apiClient;
                         page_name = self._to_pascal_case(entity_name)
                         page_filename = f"{page_name}.js"
                         
-                        # Generate entity page with CRUD operations
-                        page_code = self._generate_entity_page(page_name, entity_name, stories)
+                        # Generate entity page with CRUD operations using analysis blueprint if available
+                        page_code = self._generate_entity_page(page_name, entity_name, stories, analysis_results)
                         with open(os.path.join(src_dir, "pages", page_filename), "w", encoding='utf-8') as f:
                             f.write(page_code)
                         
@@ -907,8 +934,8 @@ npm-debug.log
         with open(os.path.join(frontend_dir, ".gitignore"), "w", encoding='utf-8') as f:
             f.write(gitignore)
 
-    def _generate_backend(self, project_dir: str, app_name: str, epics_and_stories: Dict):
-        """Generate Python FastAPI backend code based on stories"""
+    def _generate_backend(self, project_dir: str, app_name: str, epics_and_stories: Dict, analysis_results: Dict = None):
+        """Generate Python FastAPI backend code based on stories and microservice analysis blueprint"""
         backend_dir = os.path.join(project_dir, "microservice")
         os.makedirs(backend_dir)
         
@@ -923,8 +950,8 @@ python-dotenv==1.0.0
         with open(os.path.join(backend_dir, "requirements.txt"), "w", encoding='utf-8') as f:
             f.write(requirements)
         
-        # Generate main.py with endpoints based on stories
-        endpoints_code = self._generate_endpoints_from_stories(epics_and_stories)
+        # Generate main.py with endpoints based on stories and microservice analysis blueprint
+        endpoints_code = self._generate_endpoints_from_stories(epics_and_stories, analysis_results)
         
         main_py = f'''from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -1074,8 +1101,8 @@ REACT_APP_API_URL=http://localhost:8000
         with open(os.path.join(backend_dir, ".env.example"), "w", encoding='utf-8') as f:
             f.write(env_example)
     
-    def _generate_endpoints_from_stories(self, epics_and_stories: Dict) -> str:
-        """Generate FastAPI endpoints with AI-powered implementation"""
+    def _generate_endpoints_from_stories(self, epics_and_stories: Dict, analysis_results: Dict = None) -> str:
+        """Generate FastAPI endpoints with AI-powered implementation and microservice blueprint"""
         endpoints = []
         processed_entities = set()
         
@@ -1092,6 +1119,28 @@ REACT_APP_API_URL=http://localhost:8000
                         entity_name = 'item_' + entity_name
                     
                     if entity_name not in processed_entities:
+                        # Extract microservice info from analysis if available
+                        microservice_blueprint = ""
+                        if analysis_results and analysis_results.get("microservice_analysis"):
+                            try:
+                                microservice_analysis = analysis_results["microservice_analysis"]
+                                if isinstance(microservice_analysis, str):
+                                    import json
+                                    microservice_analysis = json.loads(microservice_analysis)
+                                
+                                # Find matching microservice in analysis
+                                if microservice_analysis.get("microservices"):
+                                    for service in microservice_analysis["microservices"]:
+                                        if service.get("name") and entity_name.lower() in service["name"].lower():
+                                            microservice_blueprint = f"\nMicroservice Blueprint (from analysis):\n"
+                                            microservice_blueprint += f"- Service: {service.get('name', '')}\n"
+                                            microservice_blueprint += f"- Port: {service.get('port', '')}\n"
+                                            microservice_blueprint += f"- Database: {service.get('database', '')}\n"
+                                            microservice_blueprint += f"- Dependencies: {', '.join(service.get('dependencies', []))}\n"
+                                            break
+                            except Exception as e:
+                                print(f"Error parsing microservice analysis: {e}")
+                        
                         try:
                             # Use AI to generate endpoints
                             stories_desc = "; ".join([s.get("story_title", "Story") for s in stories])
@@ -1099,6 +1148,7 @@ REACT_APP_API_URL=http://localhost:8000
 Epic: {epic_title}
 Entity: {entity_name}
 Stories: {stories_desc}
+{microservice_blueprint}
 
 REQUIREMENTS:
 1. GET /{entity_name} - List all {entity_name} with pagination
@@ -1198,13 +1248,13 @@ def create_item(name: str, description: str = ""):
     return {"id": 1, "name": name, "description": description}
 '''
 
-    def _generate_database(self, project_dir: str, app_name: str, epics_and_stories: Dict):
-        """Generate PostgreSQL DDL code based on stories"""
+    def _generate_database(self, project_dir: str, app_name: str, epics_and_stories: Dict, analysis_results: Dict = None):
+        """Generate PostgreSQL DDL code based on stories and database analysis blueprint"""
         ddl_dir = os.path.join(project_dir, "ddl")
         os.makedirs(ddl_dir)
         
-        # Generate init.sql with actual tables based on stories
-        tables_sql = self._generate_tables_from_stories(epics_and_stories)
+        # Generate init.sql with actual tables based on stories and database analysis blueprint
+        tables_sql = self._generate_tables_from_stories(epics_and_stories, analysis_results)
         
         db_name = app_name.lower().replace(' ', '_').replace('-', '_')
         init_sql = f"""-- PostgreSQL DDL for {app_name}
@@ -1275,8 +1325,8 @@ SET search_path TO public;
         
         return entity
 
-    def _generate_tables_from_stories(self, epics_and_stories: Dict) -> str:
-        """Generate DDL table definitions with AI-powered schema design"""
+    def _generate_tables_from_stories(self, epics_and_stories: Dict, analysis_results: Dict = None) -> str:
+        """Generate DDL table definitions with AI-powered schema design and database analysis blueprint"""
         tables = []
         created_tables = set()
         
@@ -1293,6 +1343,27 @@ SET search_path TO public;
                         entity_name = 'item_' + entity_name
                     
                     if entity_name not in created_tables:
+                        # Extract database info from analysis if available
+                        database_blueprint = ""
+                        if analysis_results and analysis_results.get("database_analysis"):
+                            try:
+                                database_analysis = analysis_results["database_analysis"]
+                                if isinstance(database_analysis, str):
+                                    import json
+                                    database_analysis = json.loads(database_analysis)
+                                
+                                # Find matching table in analysis
+                                if database_analysis.get("tables"):
+                                    for table in database_analysis["tables"]:
+                                        if table.get("name") and entity_name.lower() in table["name"].lower():
+                                            database_blueprint = f"\nDatabase Blueprint (from analysis):\n"
+                                            database_blueprint += f"- Table: {table.get('name', '')}\n"
+                                            database_blueprint += f"- Fields: {', '.join(table.get('fields', []))}\n"
+                                            database_blueprint += f"- Relationships: {', '.join(table.get('relationships', []))}\n"
+                                            break
+                            except Exception as e:
+                                print(f"Error parsing database analysis: {e}")
+                        
                         try:
                             # Use AI to generate database schema
                             stories_desc = "; ".join([s.get("story_title", "Story") for s in stories])
@@ -1300,6 +1371,7 @@ SET search_path TO public;
 Entity: {entity_name}
 Epic: {epic_title}
 Stories/Operations: {stories_desc}
+{database_blueprint}
 
 REQUIREMENTS:
 1. Main table for {entity_name} entity

@@ -89,3 +89,45 @@ class BatchSaveProjectItem(BaseModel):
     epic_title: str  # Epic name/title for consistency
     epic_description: str  # STORE: Epic description only
     stories: List[dict]  # List of {story_id: int, story_title: str} - NO descriptions
+
+
+# Analysis Result Schemas
+class AnalysisResultCreate(BaseModel):
+    project_id: int
+    user_id: int
+    analysis_name: str
+    selected_story_ids: List[int]
+    microservice_analysis: Optional[dict] = None
+    frontend_analysis: Optional[dict] = None
+    database_analysis: Optional[dict] = None
+
+class AnalysisResultOut(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    analysis_name: str
+    selected_story_ids: List[int]
+    microservice_analysis: Optional[dict] = None
+    frontend_analysis: Optional[dict] = None
+    database_analysis: Optional[dict] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class AnalysisResultUpdate(BaseModel):
+    analysis_name: Optional[str] = None
+    microservice_analysis: Optional[dict] = None
+    frontend_analysis: Optional[dict] = None
+    database_analysis: Optional[dict] = None
+
+class AnalysisResultList(BaseModel):
+    id: int
+    analysis_name: str
+    created_at: datetime
+    updated_at: datetime
+    story_count: int
+    
+    class Config:
+        from_attributes = True

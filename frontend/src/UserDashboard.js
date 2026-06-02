@@ -23,6 +23,7 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   const [showImpactAnalysis, setShowImpactAnalysis] = useState(false);
   const [showCodegenImplementation, setShowCodegenImplementation] = useState(false);
   const [selectedStoryIds, setSelectedStoryIds] = useState([]);
+  const [selectedAnalysisData, setSelectedAnalysisData] = useState(null);
 
   const API_URL = 'http://localhost:8000';
 
@@ -58,6 +59,9 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     setSelectedAppId(null);
     setSelectedWorkflowType(null);
     setShowImpactAnalysis(false);
+    setShowCodegenImplementation(false);
+    setSelectedStoryIds([]);
+    setSelectedAnalysisData(null);
   };
 
   // Handler to show dashboard
@@ -67,6 +71,10 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
     setShowOpenList(false);
     setCurrentChatId(null);
     setShowDashboardDialog(true);
+    setShowImpactAnalysis(false);
+    setShowCodegenImplementation(false);
+    setSelectedStoryIds([]);
+    setSelectedAnalysisData(null);
   };
 
   // Handler to open creation form from dashboard
@@ -133,8 +141,9 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
   };
 
   // Handler for Generate Code from Impact Analysis
-  const handleGenerateCode = (storyIds) => {
+  const handleGenerateCode = (storyIds, analysisData = null) => {
     setSelectedStoryIds(storyIds);
+    setSelectedAnalysisData(analysisData);
     setShowImpactAnalysis(false);
     setShowCodegenImplementation(true);
   };
@@ -153,17 +162,19 @@ const UserDashboard = ({ user, profileOpen, setProfileOpen, profileRef, onLogout
         onDeleteChat={handleDeleteChat}
         onDashboard={handleDashboard}
       />
-      <div style={{ flex: 1, padding: '2rem', marginLeft: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' }}>
+      <div style={{ flex: 1, padding: '2rem', marginLeft: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         {showCodegenImplementation ? (
           <CodegenItems
             projectId={selectedAppId}
             userId={user?.id}
             appName={chats.find(c => c.id === selectedAppId)?.title || 'Application'}
             selectedStoryIds={selectedStoryIds}
+            analysisData={selectedAnalysisData}
             onBack={() => {
               setShowCodegenImplementation(false);
               setShowImpactAnalysis(true);
               setSelectedStoryIds([]);
+              setSelectedAnalysisData(null);
             }}
           />
         ) : showImpactAnalysis ? (

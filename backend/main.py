@@ -802,6 +802,7 @@ class CodeGenRequest(BaseModel):
     app_name: str
     github_token: Optional[str] = None  # Optional - will use stored token if not provided
     story_ids: Optional[list[int]] = None  # Optional - if provided, generate only for these stories
+    analysis_results: Optional[dict] = None  # Optional - if provided, use for code generation reference
 
 
 @app.post("/codegen/generate")
@@ -847,13 +848,34 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
             "epics": grouped
         }
         
-        # Generate code
+        # If analysis results are provided, use them; otherwise try to fetch locked analysis
+        analysis_results = request.analysis_results
+        if not analysis_results:
+            # Try to fetch the latest saved analysis for this project
+            analyses = crud.get_project_analyses(db, request.project_id, request.user_id)
+            if analyses:
+                latest_analysis = analyses[0]
+                analysis_results = {
+                    "microservice_analysis": latest_analysis.microservice_analysis,
+                    "frontend_analysis": latest_analysis.frontend_analysis,
+                    "database_analysis": latest_analysis.database_analysis
+                }
+        
+        # Generate code with analysis results as reference
         code_generator = CodeGenerator()
         result = code_generator.generate_complete_project(
             app_name=request.app_name,
             epics_and_stories=epics_data,
+            analysis_results=analysis_results,
             github_token=github_token
         )
+        
+        # Store the GitHub repo URL in the database for later use
+        if result.get("repo_url"):
+            chat = db.query(models.Chat).filter(models.Chat.id == request.project_id).first()
+            if chat:
+                chat.github_repo_url = result["repo_url"]
+                db.commit()
         
         return {
             "status": "success",
@@ -862,6 +884,221 @@ def generate_code(request: CodeGenRequest, db: Session = Depends(get_db)):
         }
     except Exception as e:
         print(f"ERROR in generate_code: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UpdatePreviewRequest(BaseModel):
+    project_id: int
+    type: str  # 'planned' or 'custom'
+    feature_type: Optional[str] = 'fullstack'  # 'frontend', 'backend', or 'fullstack'
+    story_ids: Optional[list[int]] = None
+    custom_description: Optional[str] = None
+
+
+@app.post("/codegen/preview-update")
+def preview_update(request: UpdatePreviewRequest, db: Session = Depends(get_db)):
+    """Generate preview of what will be added/updated"""
+    try:
+        from agent import AIAgent
+        
+        agent = AIAgent()
+        
+        if request.type == 'planned':
+            # Get all project items
+            all_items = crud.get_all_project_items(db, request.project_id)
+            
+            # Get the selected stories
+            selected_titles = []
+            if request.story_ids:
+                story_ids_set = set(request.story_ids)
+                for item in all_items:
+                    if item.story_id in story_ids_set:
+                        selected_titles.append(item.story_title)
+            
+            # Build prompt for preview
+            story_titles = ', '.join(selected_titles) if selected_titles else "Feature story"
+            prompt = f"""Based on these planned stories/features: {story_titles}
+            
+Generate a JSON preview of what components, endpoints, and database tables will be created.
+Return ONLY valid JSON with no markdown, no extra text, just the JSON object:
+{{
+  "components": [
+    {{"name": "ComponentName", "description": "what it does"}},
+    {{"name": "AnotherComponent", "description": "description"}}
+  ],
+  "endpoints": [
+    {{"method": "GET", "path": "/api/path", "description": "fetch data"}},
+    {{"method": "POST", "path": "/api/path", "description": "create/update data"}}
+  ],
+  "tables": [
+    {{"name": "table_name", "columns": ["id", "name", "created_at"]}}
+  ]
+}}"""
+        else:  # custom
+            prompt = f"""Based on this feature description: {request.custom_description}
+            
+Generate a JSON preview of what components, endpoints, and database tables will be created.
+Return ONLY valid JSON with no markdown, no extra text, just the JSON object:
+{{
+  "components": [
+    {{"name": "ComponentName", "description": "what it does"}},
+    {{"name": "AnotherComponent", "description": "description"}}
+  ],
+  "endpoints": [
+    {{"method": "GET", "path": "/api/path", "description": "fetch data"}},
+    {{"method": "POST", "path": "/api/path", "description": "create/update data"}}
+  ],
+  "tables": [
+    {{"name": "table_name", "columns": ["id", "name", "created_at"]}}
+  ]
+}}"""
+        
+        # Get AI response
+        response = agent.chat(prompt)
+        
+        # Parse JSON from response
+        import json
+        try:
+            # Try to extract JSON from response
+            start_idx = response.find('{')
+            end_idx = response.rfind('}') + 1
+            if start_idx != -1 and end_idx > start_idx:
+                json_str = response[start_idx:end_idx]
+                preview_data = json.loads(json_str)
+            else:
+                # Fallback if no JSON found
+                raise ValueError("No JSON found in response")
+        except (json.JSONDecodeError, ValueError):
+            # Provide default preview data
+            preview_data = {
+                "components": [{"name": "NewFeature", "description": "New feature component"}],
+                "endpoints": [{"method": "POST", "path": "/api/new-feature", "description": "New feature endpoint"}],
+                "tables": [{"name": "new_feature", "columns": ["id", "name", "created_at"]}]
+            }
+        
+        # Filter based on feature_type
+        if request.feature_type == 'frontend':
+            # Only return components
+            preview_data = {
+                "components": preview_data.get("components", []),
+                "endpoints": [],
+                "tables": []
+            }
+        elif request.feature_type == 'backend':
+            # Only return endpoints and tables
+            preview_data = {
+                "components": [],
+                "endpoints": preview_data.get("endpoints", []),
+                "tables": preview_data.get("tables", [])
+            }
+        # For 'fullstack', return everything (no filtering)
+        
+        return preview_data
+        
+    except Exception as e:
+        print(f"ERROR in preview_update: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UpdateGenerateRequest(BaseModel):
+    project_id: int
+    user_id: int
+    github_url: Optional[str] = None  # The repository URL to update (optional, fetched from DB if not provided)
+    type: str  # 'planned' or 'custom'
+    feature_type: Optional[str] = 'fullstack'  # 'frontend', 'backend', or 'fullstack'
+    story_ids: Optional[list[int]] = None
+    custom_description: Optional[str] = None
+
+
+class SetGitHubUrlRequest(BaseModel):
+    project_id: int
+    github_url: str
+
+
+@app.post("/codegen/set-github-url")
+def set_github_url(request: SetGitHubUrlRequest, db: Session = Depends(get_db)):
+    """Set/Update GitHub URL for an existing project"""
+    try:
+        chat = db.query(models.Chat).filter(models.Chat.id == request.project_id).first()
+        if not chat:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        chat.github_repo_url = request.github_url
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"GitHub URL updated for project {request.project_id}",
+            "github_url": request.github_url
+        }
+    except Exception as e:
+        print(f"ERROR in set_github_url: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/codegen/update")
+def update_project(request: UpdateGenerateRequest, db: Session = Depends(get_db)):
+    """Generate and push code updates to existing GitHub repository"""
+    try:
+        from codegen.code_updater import CodeUpdater
+        
+        # Get the project/chat to retrieve GitHub repo URL
+        chat = db.query(models.Chat).filter(models.Chat.id == request.project_id).first()
+        if not chat:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Get GitHub repo URL - use provided or fetch from database
+        github_url = request.github_url or chat.github_repo_url
+        if not github_url:
+            raise HTTPException(
+                status_code=400, 
+                detail="GitHub repository URL not found. Please provide it via /codegen/set-github-url endpoint or include it in the request."
+            )
+        
+        # Get GitHub token
+        user = crud.get_user(db, request.user_id)
+        if not user or not user.github_oauth_token:
+            raise HTTPException(status_code=400, detail="GitHub not connected. Please connect your GitHub account first.")
+        
+        github_token = user.github_oauth_token
+        
+        # Initialize updater
+        updater = CodeUpdater()
+        
+        # Generate update
+        if request.type == 'planned':
+            result = updater.generate_update(
+                repo_url=github_url,
+                github_token=github_token,
+                story_ids=request.story_ids,
+                feature_name=f"Update {request.project_id}",
+                feature_type=request.feature_type
+            )
+        else:  # custom
+            result = updater.generate_update(
+                repo_url=github_url,
+                github_token=github_token,
+                custom_description=request.custom_description,
+                feature_name=request.custom_description[:30],
+                feature_type=request.feature_type
+            )
+        
+        return {
+            "status": "success",
+            "message": result["message"],
+            "components_added": result.get("components_added", 0),
+            "endpoints_added": result.get("endpoints_added", 0),
+            "migrations_added": result.get("migrations_added", 0),
+            "github_url": github_url
+        }
+        
+    except HTTPException as he:
+        # Re-raise HTTPExceptions as-is (they have proper status codes)
+        raise he
+    except Exception as e:
+        print(f"ERROR in update_project: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -977,4 +1214,94 @@ def disconnect_github(user_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== ANALYSIS RESULTS ENDPOINTS ====================
+
+@app.get("/analysis-results/{project_id}")
+def get_project_analyses(project_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Get all saved analyses for a project"""
+    try:
+        analyses = crud.get_project_analyses(db, project_id, user_id)
+        
+        # Return list of analyses (without full details)
+        return [
+            {
+                "id": a.id,
+                "project_id": a.project_id,
+                "analysis_name": a.analysis_name,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "selected_story_ids": a.selected_story_ids
+            }
+            for a in analyses
+        ]
+    except Exception as e:
+        print(f"ERROR in get_project_analyses: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analysis-results/{project_id}/{analysis_id}")
+def get_analysis_result(project_id: int, analysis_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Get a specific analysis result with full details"""
+    try:
+        analysis = crud.get_analysis_result(db, analysis_id, user_id)
+        
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        if analysis.project_id != project_id:
+            raise HTTPException(status_code=403, detail="Unauthorized access to this analysis")
+        
+        return {
+            "id": analysis.id,
+            "project_id": analysis.project_id,
+            "analysis_name": analysis.analysis_name,
+            "selected_story_ids": analysis.selected_story_ids,
+            "microservice_analysis": analysis.microservice_analysis,
+            "frontend_analysis": analysis.frontend_analysis,
+            "database_analysis": analysis.database_analysis,
+            "created_at": analysis.created_at.isoformat() if analysis.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in get_analysis_result: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis-results/{project_id}")
+def save_analysis_result(project_id: int, payload: schemas.AnalysisResultCreate, db: Session = Depends(get_db)):
+    """Save a new analysis result"""
+    try:
+        # Ensure project_id matches
+        if payload.project_id != project_id:
+            raise HTTPException(status_code=400, detail="Project ID mismatch")
+        
+        analysis = crud.create_analysis_result(db, payload)
+        
+        return {
+            "id": analysis.id,
+            "project_id": analysis.project_id,
+            "analysis_name": analysis.analysis_name,
+            "created_at": analysis.created_at.isoformat() if analysis.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in save_analysis_result: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/analysis-results/{analysis_id}")
+def delete_analysis_result(analysis_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Delete an analysis result"""
+    try:
+        success = crud.delete_analysis_result(db, analysis_id, user_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        return {"status": "Analysis deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in delete_analysis_result: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

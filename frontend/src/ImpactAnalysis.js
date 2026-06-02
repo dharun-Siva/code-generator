@@ -13,6 +13,20 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
   const [selectedStories, setSelectedStories] = useState({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisPerformed, setAnalysisPerformed] = useState(false);
+  
+  // Save Analysis State
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [analysisName, setAnalysisName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedAnalyses, setSavedAnalyses] = useState([]);
+  const [showSavedAnalysesList, setShowSavedAnalysesList] = useState(false);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(false);
+  
+  // Locked Analysis State
+  const [isAnalysisLocked, setIsAnalysisLocked] = useState(false);
+  const [lockedAnalysisId, setLockedAnalysisId] = useState(null);
+  const [lockedAnalysisName, setLockedAnalysisName] = useState(null);
 
   const API_URL = 'http://localhost:8000';
 
@@ -21,6 +35,13 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
       fetchProjectItems();
     }
   }, [projectId, userId]);
+
+  // Check for saved analysis after stories are loaded
+  useEffect(() => {
+    if (stories.epics && Object.keys(stories.epics).length > 0 && projectId && userId && !isAnalysisLocked) {
+      checkForSavedAnalysis();
+    }
+  }, [stories.epics]);
 
   const fetchProjectItems = async () => {
     try {
@@ -37,6 +58,67 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
       setError('Error loading project items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check if this project already has a saved analysis
+  const checkForSavedAnalysis = async () => {
+    try {
+      const response = await fetch(`${API_URL}/analysis-results/${projectId}?user_id=${userId}`);
+      if (response.ok) {
+        const analyses = await response.json();
+        
+        // If there's at least one saved analysis, lock the interface and load it
+        if (analyses.length > 0) {
+          const latestAnalysis = analyses[0]; // Get the most recent one
+          
+          // Load the full analysis data
+          const detailResponse = await fetch(
+            `${API_URL}/analysis-results/${projectId}/${latestAnalysis.id}?user_id=${userId}`
+          );
+          
+          if (detailResponse.ok) {
+            const fullAnalysis = await detailResponse.json();
+            
+            // Load the analysis data
+            setMicroserviceAnalysis(fullAnalysis.microservice_analysis);
+            setFrontendAnalysis(fullAnalysis.frontend_analysis);
+            setDatabaseAnalysis(fullAnalysis.database_analysis);
+            
+            // Restore selected stories - build a mapping of storyId -> epic ID from stories state
+            const newSelectedStories = {};
+            if (fullAnalysis.selected_story_ids && stories.epics) {
+              const storyIdToEpic = {};
+              
+              // Build reverse mapping of story ID to epic ID
+              Object.entries(stories.epics).forEach(([epicId, epicData]) => {
+                if (epicData.stories && Array.isArray(epicData.stories)) {
+                  epicData.stories.forEach(story => {
+                    storyIdToEpic[story.story_id] = epicId;
+                  });
+                }
+              });
+              
+              // Now restore selected stories using the mapping
+              fullAnalysis.selected_story_ids.forEach(storyId => {
+                const epicId = storyIdToEpic[storyId];
+                if (epicId) {
+                  newSelectedStories[`${epicId}-${storyId}`] = true;
+                }
+              });
+            }
+            setSelectedStories(newSelectedStories);
+            
+            // Lock the analysis
+            setAnalysisPerformed(true);
+            setIsAnalysisLocked(true);
+            setLockedAnalysisId(latestAnalysis.id);
+            setLockedAnalysisName(latestAnalysis.analysis_name);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error checking for saved analysis:', err);
     }
   };
 
@@ -147,9 +229,156 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
       return;
     }
 
+    // Prepare analysis data to pass to implementation page
+    const analysisData = {
+      microservice_analysis: microserviceAnalysis,
+      frontend_analysis: frontendAnalysis,
+      database_analysis: databaseAnalysis
+    };
+
     // Call the onGenerateCode callback to navigate to implementation page
     if (onGenerateCode) {
-      onGenerateCode(selectedStoryIds);
+      onGenerateCode(selectedStoryIds, analysisData);
+    }
+  };
+
+  // ============ SAVE ANALYSIS FUNCTIONS ============
+
+  const fetchSavedAnalyses = async () => {
+    try {
+      setLoadingAnalyses(true);
+      const response = await fetch(
+        `${API_URL}/analysis-results/${projectId}?user_id=${userId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setSavedAnalyses(data);
+      }
+    } catch (err) {
+      console.error('Error fetching saved analyses:', err);
+    } finally {
+      setLoadingAnalyses(false);
+    }
+  };
+
+  const handleSaveAnalysis = async () => {
+    if (!analysisName.trim()) {
+      alert('Please enter a name for this analysis');
+      return;
+    }
+
+    // Get selected story IDs
+    const selectedStoryIds = Object.keys(selectedStories)
+      .filter(key => selectedStories[key])
+      .map(key => {
+        const [epicId, storyId] = key.split('-');
+        return parseInt(storyId);
+      });
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`${API_URL}/analysis-results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          user_id: userId,
+          analysis_name: analysisName.trim(),
+          selected_story_ids: selectedStoryIds,
+          microservice_analysis: microserviceAnalysis,
+          frontend_analysis: frontendAnalysis,
+          database_analysis: databaseAnalysis,
+        }),
+      });
+
+      if (response.ok) {
+        const savedAnalysis = await response.json();
+        setSaveSuccess(true);
+        setAnalysisName('');
+        setShowSaveModal(false);
+        
+        // Lock the analysis - this is now the definitive version for this project
+        setIsAnalysisLocked(true);
+        setLockedAnalysisId(savedAnalysis.id);
+        setLockedAnalysisName(savedAnalysis.analysis_name);
+        
+        // Refresh the saved analyses list
+        await fetchSavedAnalyses();
+        
+        // Show success message
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        alert('Failed to save analysis. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error saving analysis:', err);
+      alert('Error saving analysis: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadAnalysis = async (analysisId) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/analysis-results/${projectId}/${analysisId}?user_id=${userId}`
+      );
+      if (response.ok) {
+        const analysis = await response.json();
+        
+        // Load the analysis data
+        setMicroserviceAnalysis(analysis.microservice_analysis);
+        setFrontendAnalysis(analysis.frontend_analysis);
+        setDatabaseAnalysis(analysis.database_analysis);
+        
+        // Restore selected stories
+        const newSelectedStories = {};
+        if (analysis.selected_story_ids) {
+          analysis.selected_story_ids.forEach(storyId => {
+            // Find the epic ID for this story
+            Object.entries(stories.epics || {}).forEach(([epicId, epicData]) => {
+              const story = epicData.stories.find(s => s.story_id === storyId);
+              if (story) {
+                newSelectedStories[`${epicId}-${storyId}`] = true;
+              }
+            });
+          });
+        }
+        setSelectedStories(newSelectedStories);
+        setAnalysisPerformed(true);
+        setActiveTab('microservices');
+        setShowSavedAnalysesList(false);
+      }
+    } catch (err) {
+      console.error('Error loading analysis:', err);
+      alert('Error loading analysis: ' + err.message);
+    }
+  };
+
+  const handleDeleteAnalysis = async (analysisId) => {
+    if (!window.confirm('Are you sure you want to delete this analysis?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/analysis-results/${analysisId}?user_id=${userId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (response.ok) {
+        // Refresh the saved analyses list
+        await fetchSavedAnalyses();
+      } else {
+        alert('Failed to delete analysis. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error deleting analysis:', err);
+      alert('Error deleting analysis: ' + err.message);
     }
   };
 
@@ -669,20 +898,51 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
 
           {activeTab === 'stories' && (
             <div>
+              {isAnalysisLocked && (
+                <div className="impact-locked-indicator">
+                  <span>🔒 Analysis Locked</span>
+                  <span className="locked-name">Saved as: {lockedAnalysisName}</span>
+                </div>
+              )}
               <div className="impact-stories-header">
                 <button 
                   className="impact-analyse-btn"
                   onClick={handleAnalyse}
-                  disabled={analysisLoading}
+                  disabled={analysisLoading || isAnalysisLocked}
+                  title={isAnalysisLocked ? "Analysis is locked for this project" : "Analyse selected stories"}
                 >
                   {analysisLoading ? '⏳ Analysing...' : '🔍 Analyse Selected Stories'}
                 </button>
                 <button 
                   className="impact-generate-btn"
                   onClick={handleGenerateCode}
+                  disabled={!microserviceAnalysis}
+                  title="Generate code for selected stories"
                 >
                   💻 Generate Code
                 </button>
+                {analysisPerformed && microserviceAnalysis && !isAnalysisLocked && (
+                  <>
+                    <button 
+                      className="impact-save-btn"
+                      onClick={() => setShowSaveModal(true)}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? '💾 Saving...' : '💾 Save Analysis'}
+                    </button>
+                    <button 
+                      className="impact-view-saved-btn"
+                      onClick={() => {
+                        setShowSavedAnalysesList(!showSavedAnalysesList);
+                        if (!showSavedAnalysesList) {
+                          fetchSavedAnalyses();
+                        }
+                      }}
+                    >
+                      📂 View Saved ({savedAnalyses.length})
+                    </button>
+                  </>
+                )}
                 <span className="impact-selected-count">
                   {Object.values(selectedStories).filter(Boolean).length} selected
                 </span>
@@ -711,14 +971,16 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
                         const storyKey = `${epicId}-${story.story_id}`;
                         const isSelected = selectedStories[storyKey] || false;
                         return (
-                          <div key={storyKey} className={`impact-story-item ${isSelected ? 'selected' : ''}`}>
+                          <div key={storyKey} className={`impact-story-item ${isSelected ? 'selected' : ''} ${isAnalysisLocked ? 'locked' : ''}`}>
                             <div className="impact-story-header">
                               <input
                                 type="checkbox"
                                 className="impact-story-checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleStorySelection(epicId, story.story_id)}
+                                disabled={isAnalysisLocked}
                                 aria-label={`Select ${story.story_title}`}
+                                title={isAnalysisLocked ? "Analysis is locked for this project" : "Select story"}
                               />
                               <span className="impact-story-number">Story {story.story_id}:</span>
                               <h3 className="impact-story-title">{story.story_title}</h3>
@@ -732,6 +994,120 @@ const ImpactAnalysis = ({ projectId, userId, appName, onBack, onGenerateCode }) 
                 </div>
               ))}
               </div>
+            </div>
+          )}
+
+          {/* Show Saved Analyses List */}
+          {showSavedAnalysesList && (
+            <div className="impact-saved-analyses-panel">
+              <div className="impact-saved-header">
+                <h3>Saved Analyses</h3>
+                <button 
+                  className="impact-close-btn"
+                  onClick={() => setShowSavedAnalysesList(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              {loadingAnalyses ? (
+                <div className="impact-loading">Loading saved analyses...</div>
+              ) : savedAnalyses.length === 0 ? (
+                <div className="impact-no-saved">No saved analyses yet</div>
+              ) : (
+                <div className="impact-analyses-list">
+                  {savedAnalyses.map((analysis) => (
+                    <div key={analysis.id} className="impact-analysis-item">
+                      <div className="impact-analysis-content">
+                        <div className="impact-analysis-name">{analysis.analysis_name}</div>
+                        <div className="impact-analysis-meta">
+                          <span className="impact-analysis-date">
+                            {new Date(analysis.created_at).toLocaleDateString()} {new Date(analysis.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                          <span className="impact-analysis-stories">{analysis.story_count} stories</span>
+                        </div>
+                      </div>
+                      <div className="impact-analysis-actions">
+                        <button 
+                          className="impact-load-btn"
+                          onClick={() => handleLoadAnalysis(analysis.id)}
+                          title="Load this analysis"
+                        >
+                          📂 Load
+                        </button>
+                        <button 
+                          className="impact-delete-btn"
+                          onClick={() => handleDeleteAnalysis(analysis.id)}
+                          title="Delete this analysis"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Save Analysis Modal */}
+          {showSaveModal && (
+            <div className="impact-modal-overlay" onClick={() => setShowSaveModal(false)}>
+              <div className="impact-save-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="impact-modal-header">
+                  <h3>Save Analysis</h3>
+                  <button 
+                    className="impact-close-btn"
+                    onClick={() => setShowSaveModal(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="impact-modal-body">
+                  <p>Enter a name for this analysis:</p>
+                  <input
+                    type="text"
+                    className="impact-analysis-name-input"
+                    placeholder="e.g., Student Management - Initial Design"
+                    value={analysisName}
+                    onChange={(e) => setAnalysisName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveAnalysis();
+                      }
+                    }}
+                    maxLength={100}
+                    autoFocus
+                  />
+                  <div className="impact-modal-info">
+                    <strong>Selected Stories:</strong> {Object.values(selectedStories).filter(Boolean).length}
+                  </div>
+                </div>
+
+                <div className="impact-modal-footer">
+                  <button 
+                    className="impact-modal-cancel-btn"
+                    onClick={() => setShowSaveModal(false)}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="impact-modal-save-btn"
+                    onClick={handleSaveAnalysis}
+                    disabled={isSaving || !analysisName.trim()}
+                  >
+                    {isSaving ? '💾 Saving...' : '💾 Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {saveSuccess && (
+            <div className="impact-success-message">
+              ✅ Analysis saved successfully!
             </div>
           )}
 

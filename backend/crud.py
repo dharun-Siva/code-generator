@@ -273,3 +273,83 @@ def update_user_github_token(db: Session, user_id: int, token: str, github_usern
         db.rollback()
         logging.error(f"Error updating GitHub token: {e}")
         raise
+
+
+# ==================== ANALYSIS RESULTS CRUD OPERATIONS ====================
+
+def create_analysis_result(db: Session, analysis_result: schemas.AnalysisResultCreate):
+    """Save analysis results for selected stories"""
+    try:
+        db_analysis = models.AnalysisResult(
+            project_id=analysis_result.project_id,
+            user_id=analysis_result.user_id,
+            analysis_name=analysis_result.analysis_name,
+            selected_story_ids=analysis_result.selected_story_ids,
+            microservice_analysis=analysis_result.microservice_analysis,
+            frontend_analysis=analysis_result.frontend_analysis,
+            database_analysis=analysis_result.database_analysis,
+        )
+        db.add(db_analysis)
+        db.commit()
+        db.refresh(db_analysis)
+        logging.info(f"Analysis result saved: {analysis_result.analysis_name} for project {analysis_result.project_id}")
+        return db_analysis
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error saving analysis result: {e}")
+        raise
+
+def get_analysis_result(db: Session, analysis_id: int, user_id: int):
+    """Get a specific analysis result"""
+    return db.query(models.AnalysisResult).filter(
+        models.AnalysisResult.id == analysis_id,
+        models.AnalysisResult.user_id == user_id
+    ).first()
+
+def get_project_analyses(db: Session, project_id: int, user_id: int):
+    """Get all saved analyses for a project"""
+    return db.query(models.AnalysisResult).filter(
+        models.AnalysisResult.project_id == project_id,
+        models.AnalysisResult.user_id == user_id
+    ).order_by(models.AnalysisResult.created_at.desc()).all()
+
+def update_analysis_result(db: Session, analysis_id: int, user_id: int, 
+                          analysis_name: str = None, 
+                          microservice_analysis = None,
+                          frontend_analysis = None,
+                          database_analysis = None):
+    """Update an analysis result"""
+    try:
+        db_analysis = get_analysis_result(db, analysis_id, user_id)
+        if db_analysis:
+            if analysis_name:
+                db_analysis.analysis_name = analysis_name
+            if microservice_analysis is not None:
+                db_analysis.microservice_analysis = microservice_analysis
+            if frontend_analysis is not None:
+                db_analysis.frontend_analysis = frontend_analysis
+            if database_analysis is not None:
+                db_analysis.database_analysis = database_analysis
+            db.commit()
+            db.refresh(db_analysis)
+            logging.info(f"Analysis result updated: {analysis_id}")
+        return db_analysis
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating analysis result: {e}")
+        raise
+
+def delete_analysis_result(db: Session, analysis_id: int, user_id: int):
+    """Delete an analysis result"""
+    try:
+        db_analysis = get_analysis_result(db, analysis_id, user_id)
+        if db_analysis:
+            db.delete(db_analysis)
+            db.commit()
+            logging.info(f"Analysis result deleted: {analysis_id}")
+            return True
+        return False
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error deleting analysis result: {e}")
+        raise
